@@ -238,6 +238,15 @@ ipcMain.handle("render:export", async (event, project: any) => {
     );
     base = next;
   });
+  const drawtextHelp = spawnSync(
+    ffmpegPath,
+    ["-hide_banner", "-h", "filter=drawtext"],
+    { encoding: "utf8", windowsHide: true },
+  );
+  const supportsTextAlign =
+    `${drawtextHelp.stdout || ""}\n${drawtextHelp.stderr || ""}`.includes(
+      "text_align",
+    );
   let textIndex = 0;
   const textClips = project.clips.filter((c: any) => c.kind === "text");
   for (const clip of textClips) {
@@ -293,7 +302,7 @@ ipcMain.handle("render:export", async (event, project: any) => {
     const fontSize = Math.max(1, (clip.fontSize || 42) * fontScale);
     const border = Math.max(1, 10 * fontScale);
     filters.push(
-      `[${base}]drawtext=fontfile='${koreanFont}':textfile='${escapedTextFile}':fontcolor=${clip.textColor || "white"}@${clip.opacity ?? 1}:fontsize=${fontSize}:line_spacing=${fontSize * 0.25}:text_align=C:box=1:boxcolor=${bg}:boxborderw=${border}:x=w*${(clip.x ?? 50) / 100}-text_w/2:y=h*${(clip.y ?? 82) / 100}-text_h/2:enable='between(t,${clip.start},${clip.start + clip.duration})'[${next}]`,
+      `[${base}]drawtext=fontfile='${koreanFont}':textfile='${escapedTextFile}':fontcolor=${clip.textColor || "white"}@${clip.opacity ?? 1}:fontsize=${fontSize}:line_spacing=${fontSize * 0.25}${supportsTextAlign ? ":text_align=C" : ""}:box=1:boxcolor=${bg}:boxborderw=${border}:x=w*${(clip.x ?? 50) / 100}-text_w/2:y=h*${(clip.y ?? 82) / 100}-text_h/2:enable='between(t,${clip.start},${clip.start + clip.duration})'[${next}]`,
     );
     base = next;
   }
