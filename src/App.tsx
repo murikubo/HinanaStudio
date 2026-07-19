@@ -44,6 +44,7 @@ function MosaicPreview({
   height,
   currentTime,
   playing,
+  effect = "mosaic",
 }: {
   url: string;
   kind: "video" | "image";
@@ -53,6 +54,7 @@ function MosaicPreview({
   height: number;
   currentTime: number;
   playing: boolean;
+  effect?: "mosaic" | "blur" | "black";
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const mediaRef = useRef<HTMLVideoElement | HTMLImageElement | null>(null);
@@ -71,6 +73,12 @@ function MosaicPreview({
     const draw = () => {
       const context = canvas.getContext("2d");
       if (!context) return;
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      if (effect === "black") {
+        context.fillStyle = "#000";
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        return;
+      }
       const sourceWidth =
         media instanceof HTMLVideoElement
           ? media.videoWidth
@@ -80,7 +88,6 @@ function MosaicPreview({
           ? media.videoHeight
           : media.naturalHeight;
       if (!sourceWidth || !sourceHeight) return;
-      context.clearRect(0, 0, canvas.width, canvas.height);
       const ratio =
         fit === "cover"
           ? Math.max(canvas.width / sourceWidth, canvas.height / sourceHeight)
@@ -88,6 +95,7 @@ function MosaicPreview({
       const drawWidth = sourceWidth * ratio;
       const drawHeight = sourceHeight * ratio;
       context.imageSmoothingEnabled = false;
+      context.filter = effect === "blur" ? `blur(${strength / 2}px)` : "none";
       context.drawImage(
         media,
         (canvas.width - drawWidth) / 2,
@@ -115,7 +123,7 @@ function MosaicPreview({
       }
       mediaRef.current = null;
     };
-  }, [url, kind, fit, strength, width, height]);
+  }, [url, kind, fit, strength, width, height, effect]);
 
   useEffect(() => {
     const media = mediaRef.current;
@@ -130,8 +138,18 @@ function MosaicPreview({
     <canvas
       ref={canvasRef}
       className="mosaic-content"
-      width={Math.max(1, Math.round(width / Math.max(2, strength)))}
-      height={Math.max(1, Math.round(height / Math.max(2, strength)))}
+      width={Math.max(
+        1,
+        Math.round(
+          effect === "mosaic" ? width / Math.max(2, strength) : width / 2,
+        ),
+      )}
+      height={Math.max(
+        1,
+        Math.round(
+          effect === "mosaic" ? height / Math.max(2, strength) : height / 2,
+        ),
+      )}
     />
   );
 }
@@ -187,6 +205,9 @@ type Clip = {
     width: number;
     height: number;
     strength: number;
+    shape?: "rectangle" | "ellipse";
+    effect?: "mosaic" | "blur" | "black";
+    feather?: number;
   };
 };
 type Track = {
@@ -1552,6 +1573,10 @@ export default function App() {
                 disabled={!active || !["video", "image"].includes(active.kind)}
                 onChange={(e) => update({ mosaic: +e.target.value })}
               />
+              <div className="mask-heading">
+                <b>영상 마스킹</b>
+                <span>미리보기에서 이동·크기 조절</span>
+              </div>
               <button
                 className={active?.mosaicRegion ? "effect-on" : ""}
                 disabled={!active || !["video", "image"].includes(active.kind)}
@@ -1559,19 +1584,60 @@ export default function App() {
                   update({
                     mosaicRegion: active?.mosaicRegion
                       ? undefined
-                      : { x: 35, y: 35, width: 30, height: 30, strength: 12 },
+                      : {
+                          x: 35,
+                          y: 35,
+                          width: 30,
+                          height: 30,
+                          strength: 12,
+                          shape: "rectangle",
+                          effect: "mosaic",
+                          feather: 0,
+                        },
                   })
                 }
               >
                 {active?.mosaicRegion
-                  ? "부분 모자이크 제거"
-                  : "부분 모자이크 추가"}
+                  ? "모자이크 마스크 제거"
+                  : "모자이크 마스크 추가"}
               </button>
               {active?.mosaicRegion && (
                 <>
+                  <label>마스크 모양</label>
+                  <select
+                    className="mask-select"
+                    value={active.mosaicRegion.shape ?? "rectangle"}
+                    onChange={(e) =>
+                      update({
+                        mosaicRegion: {
+                          ...active.mosaicRegion!,
+                          shape: e.target.value as "rectangle" | "ellipse",
+                        },
+                      })
+                    }
+                  >
+                    <option value="rectangle">사각형</option>
+                    <option value="ellipse">타원형</option>
+                  </select>
+                  <label>마스크 효과</label>
+                  <select
+                    className="mask-select"
+                    value={active.mosaicRegion.effect ?? "mosaic"}
+                    onChange={(e) =>
+                      update({
+                        mosaicRegion: {
+                          ...active.mosaicRegion!,
+                          effect: e.target.value as "mosaic" | "blur" | "black",
+                        },
+                      })
+                    }
+                  >
+                    <option value="mosaic">모자이크</option>
+                    <option value="blur">블러</option>
+                    <option value="black">검게 가리기</option>
+                  </select>
                   <label>
-                    부분 모자이크 강도{" "}
-                    <em>{active.mosaicRegion.strength}단계</em>
+                    마스크 효과 강도 <em>{active.mosaicRegion.strength}단계</em>
                   </label>
                   <input
                     type="range"
@@ -1584,6 +1650,24 @@ export default function App() {
                         mosaicRegion: {
                           ...active.mosaicRegion!,
                           strength: +e.target.value,
+                        },
+                      })
+                    }
+                  />
+                  <label>
+                    경계 부드러움 <em>{active.mosaicRegion.feather ?? 0}</em>
+                  </label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="20"
+                    step="1"
+                    value={active.mosaicRegion.feather ?? 0}
+                    onChange={(e) =>
+                      update({
+                        mosaicRegion: {
+                          ...active.mosaicRegion!,
+                          feather: +e.target.value,
                         },
                       })
                     }
@@ -1747,6 +1831,14 @@ export default function App() {
                           top: `${c.mosaicRegion.y}%`,
                           width: `${c.mosaicRegion.width}%`,
                           height: `${c.mosaicRegion.height}%`,
+                          borderRadius:
+                            c.mosaicRegion.shape === "ellipse" ? "50%" : 0,
+                          maskImage:
+                            (c.mosaicRegion.feather ?? 0) > 0
+                              ? c.mosaicRegion.shape === "ellipse"
+                                ? `radial-gradient(ellipse, #000 ${100 - Math.min(40, (c.mosaicRegion.feather ?? 0) * 2)}%, transparent 100%)`
+                                : `linear-gradient(to right, transparent, #000 ${Math.min(40, (c.mosaicRegion.feather ?? 0) * 2)}%, #000 ${100 - Math.min(40, (c.mosaicRegion.feather ?? 0) * 2)}%, transparent)`
+                              : undefined,
                         }}
                         onPointerDown={(e) => beginRegionEdit(e, c)}
                       >
@@ -1764,6 +1856,7 @@ export default function App() {
                             kind={c.kind as "video" | "image"}
                             fit={c.fit ?? "contain"}
                             strength={c.mosaicRegion.strength}
+                            effect={c.mosaicRegion.effect ?? "mosaic"}
                             width={settings.width}
                             height={settings.height}
                             currentTime={Math.max(

@@ -291,10 +291,41 @@ ipcMain.handle("render:export", async (event, project: any) => {
         ry = Math.round((height * r.y) / 100),
         strength = Math.max(2, r.strength || 12);
       filters.push(`[${raw}]split=2[clean${i}][region${i}]`);
-      filters.push(
-        `[region${i}]crop=${rw}:${rh}:${rx}:${ry},scale=${Math.max(1, Math.round(rw / strength))}:${Math.max(1, Math.round(rh / strength))}:flags=neighbor,scale=${rw}:${rh}:flags=neighbor[pixel${i}]`,
-      );
-      filters.push(`[clean${i}][pixel${i}]overlay=${rx}:${ry}[${composited}]`);
+      const effectLabel = `maskeffect${i}`;
+      if (r.effect === "blur")
+        filters.push(
+          `[region${i}]crop=${rw}:${rh}:${rx}:${ry},gblur=sigma=${strength}[${effectLabel}]`,
+        );
+      else if (r.effect === "black")
+        filters.push(
+          `[region${i}]crop=${rw}:${rh}:${rx}:${ry},drawbox=c=black:t=fill[${effectLabel}]`,
+        );
+      else
+        filters.push(
+          `[region${i}]crop=${rw}:${rh}:${rx}:${ry},scale=${Math.max(1, Math.round(rw / strength))}:${Math.max(1, Math.round(rh / strength))}:flags=neighbor,scale=${rw}:${rh}:flags=neighbor[${effectLabel}]`,
+        );
+      const feather = Math.max(0, Number(r.feather || 0));
+      if (r.shape === "ellipse" || feather > 0) {
+        const ellipse =
+          "((X-W/2)*(X-W/2))/((W/2)*(W/2))+((Y-H/2)*(Y-H/2))/((H/2)*(H/2))";
+        const alpha =
+          r.shape === "ellipse"
+            ? feather > 0
+              ? `clip((1-sqrt(${ellipse}))*min(W,H)*255/${feather * 2},0,255)`
+              : `if(lte(${ellipse},1),255,0)`
+            : `clip(min(min(X,W-1-X),min(Y,H-1-Y))*255/${Math.max(1, feather)},0,255)`;
+        filters.push(
+          `nullsrc=s=${rw}x${rh},format=gray,geq=lum='${alpha}'[mask${i}]`,
+        );
+        filters.push(`[${effectLabel}][mask${i}]alphamerge[pixelmask${i}]`);
+        filters.push(
+          `[clean${i}][pixelmask${i}]overlay=${rx}:${ry}[${composited}]`,
+        );
+      } else {
+        filters.push(
+          `[clean${i}][${effectLabel}]overlay=${rx}:${ry}[${composited}]`,
+        );
+      }
     }
     const sourceLabel = clip.mosaicRegion ? composited : raw;
     filters.push(
