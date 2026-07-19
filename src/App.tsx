@@ -200,6 +200,8 @@ type Clip = {
   fit?: "contain" | "cover";
   fadeIn?: number;
   fadeOut?: number;
+  videoFadeIn?: number;
+  videoFadeOut?: number;
   brightness?: number;
   contrast?: number;
   saturation?: number;
@@ -377,6 +379,17 @@ export default function App() {
       scale: lerp(clip.motion.startScale, clip.motion.endScale),
       rotation: lerp(clip.motion.startRotation, clip.motion.endRotation),
     };
+  };
+  const visualOpacity = (clip: Clip) => {
+    const local = time - clip.start;
+    const fadeIn = Math.max(0, clip.videoFadeIn ?? 0);
+    const fadeOut = Math.max(0, clip.videoFadeOut ?? 0);
+    const inFactor = fadeIn > 0 ? Math.min(1, Math.max(0, local / fadeIn)) : 1;
+    const outFactor =
+      fadeOut > 0
+        ? Math.min(1, Math.max(0, (clip.duration - local) / fadeOut))
+        : 1;
+    return (clip.opacity ?? 1) * Math.min(inFactor, outFactor);
   };
   const setMotionPreset = (preset: string) => {
     if (!active || !["video", "image"].includes(active.kind)) return;
@@ -2352,7 +2365,7 @@ export default function App() {
                       zIndex: visualOrder + 1,
                       left: `${animated.x}%`,
                       top: `${animated.y}%`,
-                      opacity: c.opacity ?? 1,
+                      opacity: visualOpacity(c),
                       filter: `brightness(${c.brightness ?? 1}) contrast(${c.contrast ?? 1}) saturate(${c.grayscale ? 0 : (c.saturation ?? 1)}) blur(${c.blur ?? 0}px)`,
                       transform: `translate(-50%, -50%) rotate(${animated.rotation}deg) scale(${animated.scale / 100})`,
                       clipPath: c.crop
@@ -2952,6 +2965,45 @@ export default function App() {
                     value={active.opacity ?? 1}
                     onChange={(e) => update({ opacity: +e.target.value })}
                   />
+                  <h3>영상 전환</h3>
+                  <div className="row">
+                    <div>
+                      <label>페이드 인 (초)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max={active.duration}
+                        step="0.1"
+                        value={active.videoFadeIn ?? 0}
+                        onChange={(e) =>
+                          update({
+                            videoFadeIn: Math.min(
+                              active.duration,
+                              Math.max(0, +e.target.value),
+                            ),
+                          })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label>페이드 아웃 (초)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max={active.duration}
+                        step="0.1"
+                        value={active.videoFadeOut ?? 0}
+                        onChange={(e) =>
+                          update({
+                            videoFadeOut: Math.min(
+                              active.duration,
+                              Math.max(0, +e.target.value),
+                            ),
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
                   <div className="fit-buttons">
                     <button onClick={() => update({ fit: "contain" })}>
                       화면 맞춤
@@ -3331,6 +3383,40 @@ export default function App() {
                           });
                         }}
                       >
+                        {(c.kind === "audio"
+                          ? (c.fadeIn ?? 0)
+                          : (c.videoFadeIn ?? 0)) > 0 && (
+                          <i
+                            className="transition-zone fade-in"
+                            style={{
+                              width: `${Math.min(
+                                100,
+                                ((c.kind === "audio"
+                                  ? (c.fadeIn ?? 0)
+                                  : (c.videoFadeIn ?? 0)) /
+                                  c.duration) *
+                                  100,
+                              )}%`,
+                            }}
+                          />
+                        )}
+                        {(c.kind === "audio"
+                          ? (c.fadeOut ?? 0)
+                          : (c.videoFadeOut ?? 0)) > 0 && (
+                          <i
+                            className="transition-zone fade-out"
+                            style={{
+                              width: `${Math.min(
+                                100,
+                                ((c.kind === "audio"
+                                  ? (c.fadeOut ?? 0)
+                                  : (c.videoFadeOut ?? 0)) /
+                                  c.duration) *
+                                  100,
+                              )}%`,
+                            }}
+                          />
+                        )}
                         <i
                           className="trim left"
                           onPointerDown={(e) => beginClipEdit(e, c, "left")}

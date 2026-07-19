@@ -540,8 +540,25 @@ ipcMain.handle("render:export", async (event, project: any) => {
     const rotationExpression = motion
       ? `${motion.startRotation}+${motion.endRotation - motion.startRotation}*${motionProgress}`
       : String(clip.rotation ?? 0);
+    const fadeInDuration = Math.min(
+      clip.duration,
+      Math.max(0, Number(clip.videoFadeIn || 0)),
+    );
+    const fadeOutDuration = Math.min(
+      clip.duration,
+      Math.max(0, Number(clip.videoFadeOut || 0)),
+    );
+    const videoFadeFilters = `${
+      fadeInDuration > 0
+        ? `,fade=t=in:st=${clip.start}:d=${fadeInDuration}:alpha=1`
+        : ""
+    }${
+      fadeOutDuration > 0
+        ? `,fade=t=out:st=${Math.max(clip.start, clip.start + clip.duration - fadeOutDuration)}:d=${fadeOutDuration}:alpha=1`
+        : ""
+    }`;
     filters.push(
-      `[${sourceLabel}]scale=w='iw*(${scaleExpression})':h='ih*(${scaleExpression})':eval=frame,colorchannelmixer=aa=${opacity}${rotationExpression !== "0" ? `,rotate='(${rotationExpression})*PI/180':c=none:${motion ? "ow='hypot(iw,ih)':oh=ow" : "ow=rotw(iw):oh=roth(ih)"}` : ""}[${prep}]`,
+      `[${sourceLabel}]scale=w='iw*(${scaleExpression})':h='ih*(${scaleExpression})':eval=frame,colorchannelmixer=aa=${opacity}${rotationExpression !== "0" ? `,rotate='(${rotationExpression})*PI/180':c=none:${motion ? "ow='hypot(iw,ih)':oh=ow" : "ow=rotw(iw):oh=roth(ih)"}` : ""}${videoFadeFilters}[${prep}]`,
     );
     const xPercent = motion
         ? (pathExpression("x") ??

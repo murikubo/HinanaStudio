@@ -687,6 +687,25 @@ header {
   right: 0 !important;
   left: auto !important;
 }
+.transition-zone {
+  position: absolute !important;
+  z-index: 2;
+  top: 0 !important;
+  bottom: 0 !important;
+  height: auto !important;
+  pointer-events: none;
+}
+.transition-zone.fade-in {
+  left: 0 !important;
+  background: linear-gradient(135deg, #0d0e11aa, transparent 70%);
+  border-right: 1px dashed #ffffff77;
+}
+.transition-zone.fade-out {
+  right: 0 !important;
+  left: auto !important;
+  background: linear-gradient(225deg, #0d0e11aa, transparent 70%);
+  border-left: 1px dashed #ffffff77;
+}
 .playhead {
   left: 0;
   will-change: transform;
