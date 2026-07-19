@@ -339,15 +339,37 @@ ipcMain.handle("render:export", async (event, project: any) => {
     if (clip.crop) {
       const crop = clip.crop;
       const cropLabel = `crop${i}`;
-      const cropFilter = `crop=iw*${Math.max(0.1, 1 - (crop.left + crop.right) / 100)}:ih*${Math.max(0.1, 1 - (crop.top + crop.bottom) / 100)}:iw*${crop.left / 100}:ih*${crop.top / 100}`;
+      const cropLeft = Math.max(
+        0,
+        Math.min(width - 2, Math.round((width * crop.left) / 100)),
+      );
+      const cropTop = Math.max(
+        0,
+        Math.min(height - 2, Math.round((height * crop.top) / 100)),
+      );
+      const cropWidth = Math.max(
+        2,
+        width - cropLeft - Math.round((width * crop.right) / 100),
+      );
+      const cropHeight = Math.max(
+        2,
+        height - cropTop - Math.round((height * crop.bottom) / 100),
+      );
+      const cropFilter = `crop=${cropWidth}:${cropHeight}:${cropLeft}:${cropTop}`;
+      // CSS clip-path keeps the element's original box. Restore the cropped
+      // pixels to the same transparent canvas so x/y, scale and motion use the
+      // identical center in preview and export.
+      const restoreCanvas = `pad=${width}:${height}:${cropLeft}:${cropTop}:color=0x00000000`;
       if (crop.shape === "ellipse") {
         const ellipse =
           "((X-W/2)*(X-W/2))/((W/2)*(W/2))+((Y-H/2)*(Y-H/2))/((H/2)*(H/2))";
         filters.push(
-          `[${maskedSource}]${cropFilter},format=rgba,geq=a='if(lte(${ellipse},1),255,0)'[${cropLabel}]`,
+          `[${maskedSource}]${cropFilter},format=rgba,geq=a='if(lte(${ellipse},1),255,0)',${restoreCanvas}[${cropLabel}]`,
         );
       } else {
-        filters.push(`[${maskedSource}]${cropFilter}[${cropLabel}]`);
+        filters.push(
+          `[${maskedSource}]${cropFilter},${restoreCanvas}[${cropLabel}]`,
+        );
       }
       sourceLabel = cropLabel;
     }
