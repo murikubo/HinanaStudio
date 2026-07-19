@@ -349,7 +349,10 @@ ipcMain.handle("render:export", async (event, project: any) => {
       0.001,
       Math.min(1, motion?.endProgress ?? 1),
     );
-    const motionProgress = `min(1\\,max(0\\,(t-${clip.start})/${Math.max(0.001, clip.duration * motionEndProgress)}))`;
+    // The prepared stream starts at clip.start, so progress cannot be negative
+    // while it is visible. Keeping a single min() avoids nested comma escaping
+    // differences between FFmpeg builds on Windows and macOS.
+    const motionProgress = `min(1\\,(t-${clip.start})/${Math.max(0.001, clip.duration * motionEndProgress)})`;
     const scaleExpression = motion
       ? `${motion.startScale / 100}+${(motion.endScale - motion.startScale) / 100}*${motionProgress}`
       : String(scale);
