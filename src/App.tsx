@@ -288,6 +288,11 @@ export default function App() {
   const [motionEdit, setMotionEdit] = useState<"start" | "end" | "path" | null>(
     null,
   );
+  const [motionPathDraft, setMotionPathDraft] = useState<{
+    clipId: string;
+    x: number;
+    y: number;
+  } | null>(null);
   const [renderEncoder, setRenderEncoder] = useState("");
   const [showAbout, setShowAbout] = useState(false);
   const [showProjectMenu, setShowProjectMenu] = useState(false);
@@ -310,6 +315,13 @@ export default function App() {
     total = Math.max(15, ...clips.map((c) => c.start + c.duration)),
     px = 75 * zoom;
   const motionState = (clip: Clip) => {
+    if (motionPathDraft?.clipId === clip.id)
+      return {
+        x: motionPathDraft.x,
+        y: motionPathDraft.y,
+        scale: clip.motion?.endScale ?? clip.scale ?? 100,
+        rotation: clip.motion?.endRotation ?? clip.rotation ?? 0,
+      };
     if (!clip.motion)
       return {
         x: clip.x ?? 50,
@@ -1133,6 +1145,7 @@ export default function App() {
           Math.min(150, ((clientY - canvas.top) / canvas.height) * 100),
         ),
       };
+      setMotionPathDraft({ clipId: clip.id, ...point });
       const last = points[points.length - 1];
       if (last && Math.hypot(point.x - last.x, point.y - last.y) < 0.8) return;
       points.push(point);
@@ -1167,6 +1180,7 @@ export default function App() {
     const move = (event: PointerEvent) =>
       addPoint(event.clientX, event.clientY);
     const up = () => {
+      setMotionPathDraft(null);
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
     };
