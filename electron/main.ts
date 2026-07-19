@@ -34,33 +34,53 @@ const writeProjectPackage = async (targetPath: string, data: string) => {
     name: string;
     size: number;
     source: string;
+    originalName: string;
+    kind: string;
   }[] = [];
   for (const asset of project.assets || []) {
     if (!asset.path || !existsSync(asset.path)) continue;
     const stat = await fs.stat(asset.path);
     if (!stat.isFile()) continue;
     const extension = path.extname(asset.path);
-    const name = `${String(asset.id).replace(/[^a-zA-Z0-9_-]/g, "_")}${extension}`;
+    const name = `assets/${String(asset.id).replace(/[^a-zA-Z0-9_-]/g, "_")}${extension}`;
     entries.push({
       assetId: asset.id,
       name,
+      originalName: path.basename(asset.path),
+      kind: asset.kind,
       size: stat.size,
       source: asset.path,
     });
     asset.path = `bundle:${name}`;
   }
+  project.package = {
+    formatVersion: 2,
+    appVersion: app.getVersion(),
+  };
+  const projectBuffer = Buffer.from(JSON.stringify(project, null, 2), "utf8");
   const header = Buffer.from(
     JSON.stringify({
-      format: 1,
-      project,
-      entries: entries.map(({ source: _source, ...entry }) => entry),
+      formatVersion: 2,
+      app: { name: "HINANA STUDIO", version: app.getVersion() },
+      projectFile: "project.json",
+      files: [
+        { type: "project", name: "project.json", size: projectBuffer.length },
+        ...entries.map(({ source: _source, ...entry }) => ({
+          type: "asset",
+          ...entry,
+        })),
+      ],
+      thumbnails: [],
     }),
     "utf8",
   );
   const length = Buffer.alloc(4);
   length.writeUInt32LE(header.length);
   const temporary = `${targetPath}.writing-${process.pid}`;
-  await fs.writeFile(temporary, Buffer.concat([PACKAGE_MAGIC, length, header]));
+  await fs.writeFile(
+    temporary,
+    Buffer.concat([PACKAGE_MAGIC, length, header, projectBuffer]),
+  );
   for (const entry of entries)
     await pipeline(
       createReadStream(entry.source),
@@ -86,7 +106,19 @@ const readProjectPackage = async (filePath: string) => {
     );
     let offset = prefix.length + headerLength;
     const extracted = new Map<string, string>();
-    for (const entry of packageData.entries || []) {
+    let project = packageData.project;
+    const files =
+      packageData.formatVersion === 2
+        ? packageData.files || []
+        : packageData.entries || [];
+    for (const entry of files) {
+      if (entry.type === "project") {
+        const projectBuffer = Buffer.alloc(entry.size);
+        await handle.read(projectBuffer, 0, entry.size, offset);
+        project = JSON.parse(projectBuffer.toString("utf8"));
+        offset += entry.size;
+        continue;
+      }
       const destination = path.join(extractDir, path.basename(entry.name));
       if (entry.size > 0)
         await pipeline(
@@ -100,13 +132,12 @@ const readProjectPackage = async (filePath: string) => {
       offset += entry.size;
       extracted.set(entry.assetId, destination);
     }
-    packageData.project.assets = (packageData.project.assets || []).map(
-      (asset: any) => ({
-        ...asset,
-        path: extracted.get(asset.id) || asset.path,
-      }),
-    );
-    return JSON.stringify(packageData.project);
+    if (!project) throw new Error("패키지에 project.json이 없습니다.");
+    project.assets = (project.assets || []).map((asset: any) => ({
+      ...asset,
+      path: extracted.get(asset.id) || asset.path,
+    }));
+    return JSON.stringify(project);
   } finally {
     await handle.close();
   }
