@@ -421,6 +421,9 @@ ipcMain.handle("render:export", async (event, project: any) => {
     ...(audioLabels.length ? ["-c:a", "aac", "-b:a", "192k"] : []),
     "-t",
     String(total),
+    "-progress",
+    "pipe:2",
+    "-nostats",
     "-y",
     result.filePath,
   ];
@@ -428,32 +431,65 @@ ipcMain.handle("render:export", async (event, project: any) => {
   const runEncoder = (encoder: Encoder) =>
     new Promise<boolean>((resolve, reject) => {
       event.sender.send("render:encoder", encoder.label);
-      renderProcess = spawn(
-        ffmpegPath,
-        [...args, ...encoder.options, ...tail],
-        { windowsHide: true },
-      );
+      const child = spawn(ffmpegPath, [...args, ...encoder.options, ...tail], {
+        windowsHide: true,
+      });
+      renderProcess = child;
       let errorText = "";
-      renderProcess.stderr.on("data", (chunk) => {
+      let progressBuffer = "";
+      let receivedProgress = false;
+      let startupTimedOut = false;
+      const startupTimer = encoder.label.includes("VideoToolbox")
+        ? setTimeout(() => {
+            if (receivedProgress || child.exitCode !== null) return;
+            startupTimedOut = true;
+            console.warn(
+              "VideoToolbox가 20초 동안 첫 프레임을 출력하지 않아 CPU 인코더로 전환합니다.",
+            );
+            child.kill();
+          }, 20_000)
+        : null;
+      const clearStartupTimer = () => {
+        if (startupTimer) clearTimeout(startupTimer);
+      };
+      child.stderr.on("data", (chunk) => {
         const text = String(chunk);
         errorText = (errorText + text).slice(-8000);
-        const match = text.match(/time=(\d+):(\d+):(\d+(?:\.\d+)?)/);
-        if (match) {
-          const seconds = +match[1] * 3600 + +match[2] * 60 + +match[3];
-          event.sender.send(
-            "render:progress",
-            Math.min(100, (seconds / total) * 100),
-          );
+        progressBuffer += text;
+        const lines = progressBuffer.split(/\r?\n/);
+        progressBuffer = lines.pop() || "";
+        for (const line of lines) {
+          const microseconds = /^(?:out_time_us|out_time_ms)=(\d+)$/.exec(line);
+          const clock = /^out_time=(\d+):(\d+):(\d+(?:\.\d+)?)$/.exec(line);
+          const seconds = microseconds
+            ? Number(microseconds[1]) / 1_000_000
+            : clock
+              ? +clock[1] * 3600 + +clock[2] * 60 + +clock[3]
+              : null;
+          if (seconds !== null && seconds > 0) {
+            receivedProgress = true;
+            clearStartupTimer();
+            event.sender.send(
+              "render:progress",
+              Math.min(99.9, (seconds / total) * 100),
+            );
+          }
         }
       });
-      renderProcess.on("error", reject);
-      renderProcess.on("exit", (code) => {
+      child.on("error", (error) => {
+        clearStartupTimer();
+        reject(error);
+      });
+      child.on("exit", (code) => {
+        clearStartupTimer();
         renderProcess = null;
         if (renderCancelled)
           return reject(new Error("렌더링이 취소되었습니다"));
         if (code === 0) resolve(true);
         else {
-          lastEncoderError = errorText.trim();
+          lastEncoderError = startupTimedOut
+            ? "VideoToolbox가 첫 프레임 생성 시간 제한을 초과했습니다."
+            : errorText.trim();
           console.warn(`${encoder.label} 실패, 다음 인코더로 전환`, errorText);
           resolve(false);
         }
