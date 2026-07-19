@@ -7,6 +7,9 @@
   "build": {
     "appId": "studio.hinana.HinanaStudio",
     "productName": "HINANA STUDIO",
+    "directories": {
+      "output": "release"
+    },
     "icon": "HinanaStudioIcon.png",
     "extraResources": [
       {
