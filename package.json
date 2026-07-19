@@ -31,6 +31,25 @@
       "icon": "HinanaStudioIcon.png",
       "artifactName": "HINANA-STUDIO-${version}-${arch}.${ext}"
     },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["arm64"]
+        },
+        {
+          "target": "zip",
+          "arch": ["arm64"]
+        }
+      ],
+      "icon": "HinanaStudioIcon.png",
+      "category": "public.app-category.video",
+      "artifactName": "HINANA-STUDIO-${version}-${arch}.${ext}"
+    },
+    "dmg": {
+      "title": "HINANA STUDIO ${version}",
+      "writeUpdateInfo": false
+    },
     "nsis": {
       "oneClick": false,
       "perMachine": false,
@@ -46,7 +65,8 @@
     "build": "tsc && vite build && tsc -p electron/tsconfig.json",
     "preview": "vite preview",
     "start": "node scripts/launch-electron.cjs",
-    "dist:win": "npm run build && electron-builder --win nsis --x64"
+    "dist:win": "npm run build && electron-builder --win nsis --x64",
+    "dist:mac": "npm run build && electron-builder --mac dmg zip --arm64"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
