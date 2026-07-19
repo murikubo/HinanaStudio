@@ -281,6 +281,7 @@ export default function App() {
     exportPreset: "balanced" as "fast" | "balanced" | "quality",
   });
   const [renderProgress, setRenderProgress] = useState<number | null>(null);
+  const [motionEdit, setMotionEdit] = useState<"start" | "end" | null>(null);
   const [renderEncoder, setRenderEncoder] = useState("");
   const [showAbout, setShowAbout] = useState(false);
   const [showProjectMenu, setShowProjectMenu] = useState(false);
@@ -326,6 +327,7 @@ export default function App() {
   const setMotionPreset = (preset: string) => {
     if (!active || !["video", "image"].includes(active.kind)) return;
     if (preset === "none") {
+      setMotionEdit(null);
       setClips((items) =>
         items.map((item) =>
           item.id === active.id ? { ...item, motion: undefined } : item,
@@ -873,29 +875,7 @@ export default function App() {
         0,
         Math.min(100, startY + ((ev.clientY - sy) / canvas.height) * 100),
       );
-      const dx = x - startX,
-        dy = y - startY;
-      setClips((v) =>
-        v.map((c) =>
-          c.id === clip.id
-            ? {
-                ...c,
-                x,
-                y,
-                motion: clip.motion
-                  ? {
-                      ...clip.motion,
-                      preset: "custom",
-                      startX: clip.motion.startX + dx,
-                      endX: clip.motion.endX + dx,
-                      startY: clip.motion.startY + dy,
-                      endY: clip.motion.endY + dy,
-                    }
-                  : undefined,
-              }
-            : c,
-        ),
-      );
+      setClips((v) => v.map((c) => (c.id === clip.id ? { ...c, x, y } : c)));
     };
     const up = () => {
       window.removeEventListener("pointermove", move);
@@ -961,8 +941,18 @@ export default function App() {
     const canvas = e.currentTarget.parentElement!.getBoundingClientRect();
     const sx = e.clientX,
       sy = e.clientY,
-      startX = clip.x ?? 50,
-      startY = clip.y ?? 50;
+      startX =
+        clip.motion && motionEdit === "start"
+          ? clip.motion.startX
+          : clip.motion && motionEdit === "end"
+            ? clip.motion.endX
+            : (clip.x ?? 50),
+      startY =
+        clip.motion && motionEdit === "start"
+          ? clip.motion.startY
+          : clip.motion && motionEdit === "end"
+            ? clip.motion.endY
+            : (clip.y ?? 50);
     const move = (ev: PointerEvent) => {
       const x = Math.max(
         -50,
@@ -972,7 +962,43 @@ export default function App() {
         -50,
         Math.min(150, startY + ((ev.clientY - sy) / canvas.height) * 100),
       );
-      setClips((v) => v.map((c) => (c.id === clip.id ? { ...c, x, y } : c)));
+      const dx = x - startX;
+      const dy = y - startY;
+      setClips((v) =>
+        v.map((c) =>
+          c.id === clip.id
+            ? {
+                ...c,
+                x: motionEdit && clip.motion ? c.x : x,
+                y: motionEdit && clip.motion ? c.y : y,
+                motion: clip.motion
+                  ? motionEdit === "start"
+                    ? {
+                        ...clip.motion,
+                        preset: "custom",
+                        startX: clip.motion.startX + dx,
+                        startY: clip.motion.startY + dy,
+                      }
+                    : motionEdit === "end"
+                      ? {
+                          ...clip.motion,
+                          preset: "custom",
+                          endX: clip.motion.endX + dx,
+                          endY: clip.motion.endY + dy,
+                        }
+                      : {
+                          ...clip.motion,
+                          preset: "custom",
+                          startX: clip.motion.startX + dx,
+                          endX: clip.motion.endX + dx,
+                          startY: clip.motion.startY + dy,
+                          endY: clip.motion.endY + dy,
+                        }
+                  : undefined,
+              }
+            : c,
+        ),
+      );
     };
     const up = () => {
       window.removeEventListener("pointermove", move);
@@ -987,7 +1013,12 @@ export default function App() {
     const canvas = e.currentTarget.closest(".canvas")!.getBoundingClientRect();
     const startX = e.clientX;
     const startY = e.clientY;
-    const startScale = clip.scale ?? 100;
+    const startScale =
+      clip.motion && motionEdit === "start"
+        ? clip.motion.startScale
+        : clip.motion && motionEdit === "end"
+          ? clip.motion.endScale
+          : (clip.scale ?? 100);
     const move = (event: PointerEvent) => {
       const delta =
         ((event.clientX - startX + event.clientY - startY) / canvas.width) *
@@ -998,14 +1029,29 @@ export default function App() {
           item.id === clip.id
             ? {
                 ...item,
-                scale,
+                scale: motionEdit && clip.motion ? item.scale : scale,
                 motion: clip.motion
-                  ? {
-                      ...clip.motion,
-                      preset: "custom",
-                      startScale: Math.max(5, clip.motion.startScale + delta),
-                      endScale: Math.max(5, clip.motion.endScale + delta),
-                    }
+                  ? motionEdit === "start"
+                    ? {
+                        ...clip.motion,
+                        preset: "custom",
+                        startScale: Math.max(5, clip.motion.startScale + delta),
+                      }
+                    : motionEdit === "end"
+                      ? {
+                          ...clip.motion,
+                          preset: "custom",
+                          endScale: Math.max(5, clip.motion.endScale + delta),
+                        }
+                      : {
+                          ...clip.motion,
+                          preset: "custom",
+                          startScale: Math.max(
+                            5,
+                            clip.motion.startScale + delta,
+                          ),
+                          endScale: Math.max(5, clip.motion.endScale + delta),
+                        }
                   : undefined,
               }
             : item,
@@ -2657,6 +2703,43 @@ export default function App() {
                   </select>
                   {active.motion && (
                     <>
+                      <div className="motion-edit-buttons">
+                        <button
+                          className={motionEdit === "start" ? "active" : ""}
+                          onClick={() => {
+                            setMotionEdit("start");
+                            setTime(active.start);
+                          }}
+                        >
+                          시작 프레임 편집
+                        </button>
+                        <button
+                          className={motionEdit === "end" ? "active" : ""}
+                          onClick={() => {
+                            setMotionEdit("end");
+                            setTime(
+                              Math.max(
+                                active.start,
+                                active.start +
+                                  active.duration -
+                                  1 / (settings.fps || 30),
+                              ),
+                            );
+                          }}
+                        >
+                          종료 프레임 편집
+                        </button>
+                        <button
+                          className={motionEdit === null ? "active" : ""}
+                          onClick={() => setMotionEdit(null)}
+                        >
+                          전체 모션 이동
+                        </button>
+                      </div>
+                      <p className="motion-edit-hint">
+                        시작 또는 종료 프레임을 고른 뒤 미리보기에서 이미지를
+                        드래그하고, 우하단 핸들로 크기를 조절하세요.
+                      </p>
                       {(
                         [
                           ["startX", "시작 X"],
