@@ -90,8 +90,35 @@ const writeProjectPackage = async (targetPath: string, data: string) => {
       createReadStream(entry.source),
       createWriteStream(temporary, { flags: "a" }),
     );
-  await fs.copyFile(temporary, targetPath);
-  await fs.unlink(temporary);
+  // Verify the fully written package before replacing the user's last good
+  // project. The replacement uses a sibling backup because Windows cannot
+  // rename over an existing file atomically.
+  const temporaryStat = await fs.stat(temporary);
+  const expectedSize =
+    PACKAGE_MAGIC.length +
+    4 +
+    header.length +
+    projectBuffer.length +
+    entries.reduce((sum, entry) => sum + entry.size, 0);
+  if (temporaryStat.size !== expectedSize) {
+    await fs.unlink(temporary).catch(() => {});
+    throw new Error("프로젝트 패키지 쓰기 검증에 실패했습니다.");
+  }
+  const backup = `${targetPath}.backup`;
+  if (!existsSync(targetPath) && existsSync(backup))
+    await fs.rename(backup, targetPath);
+  await fs.unlink(backup).catch(() => {});
+  const hadPrevious = existsSync(targetPath);
+  if (hadPrevious) await fs.rename(targetPath, backup);
+  try {
+    await fs.rename(temporary, targetPath);
+    await fs.unlink(backup).catch(() => {});
+  } catch (error) {
+    if (!existsSync(targetPath) && existsSync(backup))
+      await fs.rename(backup, targetPath).catch(() => {});
+    await fs.unlink(temporary).catch(() => {});
+    throw error;
+  }
 };
 
 const readProjectPackage = async (filePath: string) => {
