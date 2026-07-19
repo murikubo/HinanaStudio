@@ -2088,7 +2088,7 @@ export default function App() {
                 const animated = motionState(c);
                 return (
                   <div
-                    className={`media-object ${selected === c.id ? "selected" : ""} ${selected && selected !== c.id ? "interaction-disabled" : ""}`}
+                    className={`media-object ${selected === c.id ? "selected" : ""} ${selected === c.id && motionEdit && c.motion ? "motion-editing" : ""} ${selected && selected !== c.id ? "interaction-disabled" : ""}`}
                     key={c.id}
                     onPointerDown={(e) => beginMediaDrag(e, c)}
                     onContextMenu={(e) => {
@@ -2227,6 +2227,19 @@ export default function App() {
                             />
                           ),
                         )}
+                      </div>
+                    )}
+                    {selected === c.id && motionEdit && c.motion && (
+                      <div
+                        className="motion-drag-surface"
+                        title="드래그하여 모션 위치 조절"
+                        onPointerDown={(e) => beginMediaDrag(e, c)}
+                      >
+                        <span>
+                          {motionEdit === "start"
+                            ? "시작 위치 편집"
+                            : "현재 프레임 도착 위치 편집"}
+                        </span>
                       </div>
                     )}
                     {selected === c.id && (
