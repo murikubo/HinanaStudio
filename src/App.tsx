@@ -221,6 +221,8 @@ type Clip = {
     endScale: number;
     startRotation: number;
     endRotation: number;
+    /** Normalized clip position where the end pose is reached. */
+    endProgress?: number;
   };
   mosaicRegion?: {
     x: number;
@@ -311,9 +313,13 @@ export default function App() {
         scale: clip.scale ?? 100,
         rotation: clip.rotation ?? 0,
       };
+    const endProgress = Math.max(0.001, clip.motion.endProgress ?? 1);
     const progress = Math.max(
       0,
-      Math.min(1, (time - clip.start) / Math.max(0.001, clip.duration)),
+      Math.min(
+        1,
+        (time - clip.start) / Math.max(0.001, clip.duration * endProgress),
+      ),
     );
     const lerp = (start: number, end: number) =>
       start + (end - start) * progress;
@@ -350,6 +356,7 @@ export default function App() {
       endScale: preset === "zoomOut" ? scale * 0.85 : scale,
       startRotation: rotation,
       endRotation: rotation,
+      endProgress: 1,
     };
     setClips((items) =>
       items.map((item) => (item.id === active.id ? { ...item, motion } : item)),
@@ -2716,18 +2723,37 @@ export default function App() {
                         <button
                           className={motionEdit === "end" ? "active" : ""}
                           onClick={() => {
-                            setMotionEdit("end");
-                            setTime(
-                              Math.max(
-                                active.start,
-                                active.start +
-                                  active.duration -
-                                  1 / (settings.fps || 30),
+                            const pose = motionState(active);
+                            const endProgress = Math.max(
+                              0.001,
+                              Math.min(
+                                1,
+                                (time - active.start) /
+                                  Math.max(0.001, active.duration),
                               ),
                             );
+                            setClips((items) =>
+                              items.map((item) =>
+                                item.id === active.id && item.motion
+                                  ? {
+                                      ...item,
+                                      motion: {
+                                        ...item.motion,
+                                        preset: "custom",
+                                        endX: pose.x,
+                                        endY: pose.y,
+                                        endScale: pose.scale,
+                                        endRotation: pose.rotation,
+                                        endProgress,
+                                      },
+                                    }
+                                  : item,
+                              ),
+                            );
+                            setMotionEdit("end");
                           }}
                         >
-                          종료 프레임 편집
+                          현재 프레임 도착점
                         </button>
                         <button
                           className={motionEdit === null ? "active" : ""}
@@ -2737,8 +2763,9 @@ export default function App() {
                         </button>
                       </div>
                       <p className="motion-edit-hint">
-                        시작 또는 종료 프레임을 고른 뒤 미리보기에서 이미지를
-                        드래그하고, 우하단 핸들로 크기를 조절하세요.
+                        재생 헤드를 원하는 시점에 놓고 ‘현재 프레임 도착점’을
+                        누른 뒤 이미지를 드래그하세요. 그 시점에 도착한 후에는
+                        위치가 유지됩니다.
                       </p>
                       {(
                         [
