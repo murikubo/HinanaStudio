@@ -892,6 +892,38 @@ export default function App() {
   };
   const update = (patch: Partial<Clip>) =>
     setClips((v) => v.map((c) => (c.id === selected ? { ...c, ...patch } : c)));
+  const setMotionRangeBoundary = (kind: "start" | "end") => {
+    if (!active?.motion) return;
+    const raw = (time - active.start) / Math.max(0.001, active.duration);
+    const progress = Math.max(0, Math.min(1, raw));
+    setClips((items) =>
+      items.map((item) => {
+        if (item.id !== active.id || !item.motion) return item;
+        return {
+          ...item,
+          motion: {
+            ...item.motion,
+            ...(kind === "start"
+              ? {
+                  startProgress: Math.min(
+                    progress,
+                    (item.motion.endProgress ?? 1) - 0.001,
+                  ),
+                }
+              : {
+                  endProgress: Math.max(
+                    progress,
+                    (item.motion.startProgress ?? 0) + 0.001,
+                  ),
+                }),
+          },
+        };
+      }),
+    );
+    flash(
+      `모션 ${kind === "start" ? "시작" : "종료"} 시간을 ${Math.max(0, time - active.start).toFixed(2)}초로 설정했습니다`,
+    );
+  };
   const addText = () => {
     const track = (
       tracks.find((t) => t.id === activeTrack && t.type === "text") ||
@@ -2918,40 +2950,26 @@ export default function App() {
                           경로 직접 그리기
                         </button>
                         <button
-                          onClick={() =>
-                            update({
-                              motion: {
-                                ...active.motion!,
-                                startProgress: Math.max(
-                                  0,
-                                  Math.min(
-                                    (active.motion?.endProgress ?? 1) - 0.001,
-                                    (time - active.start) / active.duration,
-                                  ),
-                                ),
-                              },
-                            })
-                          }
+                          className="motion-time-button"
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onClick={() => setMotionRangeBoundary("start")}
                         >
-                          현재 프레임부터 시작
+                          시작 설정 ·{" "}
+                          {(
+                            (active.motion.startProgress ?? 0) * active.duration
+                          ).toFixed(2)}
+                          초
                         </button>
                         <button
-                          onClick={() =>
-                            update({
-                              motion: {
-                                ...active.motion!,
-                                endProgress: Math.max(
-                                  (active.motion?.startProgress ?? 0) + 0.001,
-                                  Math.min(
-                                    1,
-                                    (time - active.start) / active.duration,
-                                  ),
-                                ),
-                              },
-                            })
-                          }
+                          className="motion-time-button"
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onClick={() => setMotionRangeBoundary("end")}
                         >
-                          현재 프레임에서 종료
+                          종료 설정 ·{" "}
+                          {(
+                            (active.motion.endProgress ?? 1) * active.duration
+                          ).toFixed(2)}
+                          초
                         </button>
                       </div>
                       <p className="motion-edit-hint">

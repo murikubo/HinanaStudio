@@ -1533,6 +1533,7 @@ main {
   background: #24262c;
   color: #c6c8d0;
   font-size: 10px;
+  cursor: pointer;
 }
 .motion-edit-buttons button:last-child {
   grid-column: 1 / -1;
@@ -1544,6 +1545,11 @@ main {
   border-color: #7169ff;
   background: #393468;
   color: #fff;
+}
+.motion-edit-buttons .motion-time-button {
+  border-color: #4a4d5b;
+  background: #1d1f25;
+  color: #ebeaff;
 }
 .motion-edit-hint {
   margin: 7px 15px 10px;
