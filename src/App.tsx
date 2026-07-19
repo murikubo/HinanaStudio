@@ -1177,16 +1177,27 @@ export default function App() {
     e.stopPropagation();
     const canvas = canvasRef.current?.getBoundingClientRect();
     if (!canvas) return;
+    const initialPose = motionState(clip);
+    const pointerStartX = ((e.clientX - canvas.left) / canvas.width) * 100;
+    const pointerStartY = ((e.clientY - canvas.top) / canvas.height) * 100;
+    const grabOffsetX = initialPose.x - pointerStartX;
+    const grabOffsetY = initialPose.y - pointerStartY;
     const points: { x: number; y: number }[] = [];
     const addPoint = (clientX: number, clientY: number) => {
       const point = {
         x: Math.max(
           -50,
-          Math.min(150, ((clientX - canvas.left) / canvas.width) * 100),
+          Math.min(
+            150,
+            ((clientX - canvas.left) / canvas.width) * 100 + grabOffsetX,
+          ),
         ),
         y: Math.max(
           -50,
-          Math.min(150, ((clientY - canvas.top) / canvas.height) * 100),
+          Math.min(
+            150,
+            ((clientY - canvas.top) / canvas.height) * 100 + grabOffsetY,
+          ),
         ),
       };
       setMotionPathDraft({ clipId: clip.id, ...point });
@@ -1224,6 +1235,13 @@ export default function App() {
     const move = (event: PointerEvent) =>
       addPoint(event.clientX, event.clientY);
     const up = () => {
+      const endProgress = clip.motion?.endProgress ?? 1;
+      setTime(
+        Math.min(
+          clip.start + clip.duration - 0.001,
+          clip.start + clip.duration * endProgress,
+        ),
+      );
       setMotionPathDraft(null);
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
