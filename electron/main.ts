@@ -12,6 +12,10 @@ let renderProcess: ChildProcessWithoutNullStreams | null = null;
 let renderCancelled = false;
 let currentProjectPath: string | null = null;
 
+// Set this before Electron creates the default macOS application menu.
+app.setName("HINANA STUDIO");
+app.setAppUserModelId("studio.hinana.HinanaStudio");
+
 const getAppIconPath = () => {
   const candidates = [
     path.join(process.resourcesPath, "HinanaStudioIcon.png"),
@@ -153,6 +157,24 @@ ipcMain.handle("render:export", async (event, project: any) => {
     path.join(os.tmpdir(), "hinana-render-"),
   );
   const { width = 1920, height = 1080, fps = 30 } = project.settings || {};
+  const exportPreset: "fast" | "balanced" | "quality" =
+    project.settings?.exportPreset || "balanced";
+  const presetLabel =
+    exportPreset === "fast"
+      ? "빠르게"
+      : exportPreset === "quality"
+        ? "고화질"
+        : "균형";
+  const baseMbps =
+    exportPreset === "fast" ? 8 : exportPreset === "quality" ? 20 : 12;
+  const resolutionFactor = Math.max(
+    0.75,
+    Math.min(4, (width * height) / (1920 * 1080)),
+  );
+  const targetMbps = Math.round(baseMbps * resolutionFactor);
+  const targetBitrate = `${targetMbps}M`;
+  const maxBitrate = `${Math.round(targetMbps * 1.5)}M`;
+  const bufferSize = `${targetMbps * 2}M`;
   const assets = new Map<string, any>(
     project.assets.map((a: any) => [a.id, a]),
   );
@@ -353,14 +375,18 @@ ipcMain.handle("render:export", async (event, project: any) => {
     encoderList.includes("h264_videotoolbox")
   )
     candidates.push({
-      label: "Apple VideoToolbox",
+      label: `Apple VideoToolbox · ${presetLabel}`,
       options: [
         "-c:v",
         "h264_videotoolbox",
         "-b:v",
-        "8M",
+        targetBitrate,
+        "-maxrate",
+        maxBitrate,
+        "-bufsize",
+        bufferSize,
         "-realtime",
-        "1",
+        exportPreset === "quality" ? "0" : "1",
         "-allow_sw",
         "1",
       ],
@@ -368,61 +394,92 @@ ipcMain.handle("render:export", async (event, project: any) => {
   if (process.platform === "win32") {
     if (encoderList.includes("h264_nvenc"))
       candidates.push({
-        label: "NVIDIA NVENC",
+        label: `NVIDIA NVENC · ${presetLabel}`,
         options: [
           "-c:v",
           "h264_nvenc",
           "-preset",
-          "p5",
-          "-cq",
-          "20",
+          exportPreset === "fast"
+            ? "p1"
+            : exportPreset === "quality"
+              ? "p6"
+              : "p4",
+          "-rc",
+          "vbr",
           "-b:v",
-          "0",
+          targetBitrate,
+          "-maxrate",
+          maxBitrate,
+          "-bufsize",
+          bufferSize,
         ],
       });
     if (encoderList.includes("h264_qsv"))
       candidates.push({
-        label: "Intel Quick Sync",
+        label: `Intel Quick Sync · ${presetLabel}`,
         options: [
           "-c:v",
           "h264_qsv",
           "-preset",
-          "medium",
-          "-global_quality",
-          "20",
+          exportPreset === "fast"
+            ? "veryfast"
+            : exportPreset === "quality"
+              ? "slow"
+              : "medium",
+          "-b:v",
+          targetBitrate,
         ],
       });
     if (encoderList.includes("h264_amf"))
       candidates.push({
-        label: "AMD AMF",
+        label: `AMD AMF · ${presetLabel}`,
         options: [
           "-c:v",
           "h264_amf",
           "-quality",
-          "balanced",
+          exportPreset === "fast"
+            ? "speed"
+            : exportPreset === "quality"
+              ? "quality"
+              : "balanced",
           "-rc",
-          "cqp",
-          "-qp_i",
-          "20",
-          "-qp_p",
-          "20",
+          "vbr_peak",
+          "-b:v",
+          targetBitrate,
+          "-maxrate",
+          maxBitrate,
         ],
       });
   }
   if (encoderList.includes("libx264"))
     candidates.push({
-      label: "CPU (libx264)",
-      options: ["-c:v", "libx264", "-preset", "medium", "-crf", "20"],
+      label: `CPU (libx264) · ${presetLabel}`,
+      options: [
+        "-c:v",
+        "libx264",
+        "-preset",
+        exportPreset === "fast"
+          ? "ultrafast"
+          : exportPreset === "quality"
+            ? "slow"
+            : "medium",
+        "-b:v",
+        targetBitrate,
+        "-maxrate",
+        maxBitrate,
+        "-bufsize",
+        bufferSize,
+      ],
     });
   if (encoderList.includes("libopenh264"))
     candidates.push({
-      label: "CPU (OpenH264)",
-      options: ["-c:v", "libopenh264", "-b:v", "8M"],
+      label: `CPU (OpenH264) · ${presetLabel}`,
+      options: ["-c:v", "libopenh264", "-b:v", targetBitrate],
     });
   if (encoderList.includes("mpeg4"))
     candidates.push({
-      label: "MP4 호환 모드 (MPEG-4)",
-      options: ["-c:v", "mpeg4", "-q:v", "3"],
+      label: `MP4 호환 모드 (MPEG-4) · ${presetLabel}`,
+      options: ["-c:v", "mpeg4", "-b:v", targetBitrate],
     });
   const tail = [
     "-pix_fmt",
@@ -533,8 +590,6 @@ ipcMain.handle("render:cancel", () => {
   return false;
 });
 app.whenReady().then(() => {
-  app.setName("HINANA STUDIO");
-  app.setAppUserModelId("studio.hinana.HinanaStudio");
   const icon = getAppIconPath();
   if (process.platform === "darwin" && icon) app.dock?.setIcon(icon);
   protocol.handle("hinana-media", async (request) => {

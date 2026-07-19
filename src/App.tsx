@@ -234,6 +234,7 @@ export default function App() {
     width: 1920,
     height: 1080,
     fps: 30,
+    exportPreset: "balanced" as "fast" | "balanced" | "quality",
   });
   const [renderProgress, setRenderProgress] = useState<number | null>(null);
   const [renderEncoder, setRenderEncoder] = useState("");
@@ -1047,7 +1048,12 @@ export default function App() {
     setClips([]);
     setAssets([]);
     setTracks(initialTracks);
-    setSettings({ width: 1920, height: 1080, fps: 30 });
+    setSettings({
+      width: 1920,
+      height: 1080,
+      fps: 30,
+      exportPreset: "balanced",
+    });
     setSelected("");
     setTime(0);
     setProjectName("새 프로젝트");
@@ -1301,6 +1307,23 @@ export default function App() {
               <option value="24">24fps</option>
               <option value="30">30fps</option>
               <option value="60">60fps</option>
+            </select>
+            <select
+              className="export-preset"
+              aria-label="내보내기 품질"
+              title="내보내기 품질"
+              value={settings.exportPreset ?? "balanced"}
+              onChange={(e) =>
+                setSettings((s) => ({
+                  ...s,
+                  exportPreset: e.target.value as
+                    "fast" | "balanced" | "quality",
+                }))
+              }
+            >
+              <option value="fast">빠르게</option>
+              <option value="balanced">균형</option>
+              <option value="quality">고화질</option>
             </select>
           </div>
           <button title="실행 취소" onClick={undo}>
