@@ -11,6 +11,7 @@ interface Window {
     relinkFile(kind: string): Promise<string | null>;
     createProxy(path: string): Promise<string>;
     exportVideo(project: unknown): Promise<string | null>;
+    revealFile(path: string): Promise<boolean>;
     cancelExport(): Promise<boolean>;
     onExportProgress(callback: (progress: number) => void): () => void;
     onExportEncoder(callback: (encoder: string) => void): () => void;

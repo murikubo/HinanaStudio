@@ -295,8 +295,12 @@ export default function App() {
     fps: 30,
     exportPreset: "balanced" as "fast" | "balanced" | "quality",
     useProxy: true,
+    exportMode: "all" as "all" | "range",
+    exportStart: 0,
+    exportEnd: 15,
   });
   const [renderProgress, setRenderProgress] = useState<number | null>(null);
+  const [lastExportPath, setLastExportPath] = useState<string | null>(null);
   const [motionEdit, setMotionEdit] = useState<"start" | "end" | "path" | null>(
     null,
   );
@@ -1601,6 +1605,9 @@ export default function App() {
       fps: 30,
       exportPreset: "balanced",
       useProxy: true,
+      exportMode: "all",
+      exportStart: 0,
+      exportEnd: 15,
     });
     setSelected("");
     setTime(0);
@@ -1797,7 +1804,10 @@ export default function App() {
         settings,
         assets: assets.map(({ url: _url, waveform: _wave, ...a }) => a),
       });
-      if (output) flash("MP4 내보내기를 완료했습니다");
+      if (output) {
+        setLastExportPath(output);
+        flash("MP4 내보내기를 완료했습니다");
+      }
     } catch (error) {
       flash(
         `내보내기 실패: ${error instanceof Error ? error.message : "알 수 없는 오류"}`,
@@ -1913,6 +1923,53 @@ export default function App() {
             >
               프록시
             </button>
+            <select
+              className="export-range-mode"
+              aria-label="내보내기 범위"
+              value={settings.exportMode ?? "all"}
+              onChange={(e) =>
+                setSettings((current) => ({
+                  ...current,
+                  exportMode: e.target.value as "all" | "range",
+                  exportEnd: Math.max(current.exportEnd ?? 0, total),
+                }))
+              }
+            >
+              <option value="all">전체 출력</option>
+              <option value="range">구간 출력</option>
+            </select>
+            {settings.exportMode === "range" && (
+              <>
+                <input
+                  aria-label="출력 시작 초"
+                  title="출력 시작(초)"
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  value={settings.exportStart ?? 0}
+                  onChange={(e) =>
+                    setSettings((current) => ({
+                      ...current,
+                      exportStart: Math.max(0, +e.target.value),
+                    }))
+                  }
+                />
+                <input
+                  aria-label="출력 종료 초"
+                  title="출력 종료(초)"
+                  type="number"
+                  min="0.1"
+                  step="0.1"
+                  value={settings.exportEnd ?? total}
+                  onChange={(e) =>
+                    setSettings((current) => ({
+                      ...current,
+                      exportEnd: Math.max(0.1, +e.target.value),
+                    }))
+                  }
+                />
+              </>
+            )}
           </div>
           <button title="실행 취소" onClick={undo}>
             <Undo2 />
@@ -1930,6 +1987,14 @@ export default function App() {
           <button className="export" onClick={exportVideo}>
             <Download /> 내보내기
           </button>
+          {lastExportPath && (
+            <button
+              title="마지막 내보내기 파일 위치 열기"
+              onClick={() => void window.hinana?.revealFile(lastExportPath)}
+            >
+              <FolderOpen /> 결과
+            </button>
+          )}
         </div>
       </header>
       <main>

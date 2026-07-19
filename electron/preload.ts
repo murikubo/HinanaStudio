@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld("hinana", {
     ipcRenderer.invoke("asset:create-proxy", filePath),
   exportVideo: (project: unknown) =>
     ipcRenderer.invoke("render:export", project),
+  revealFile: (filePath: string) => ipcRenderer.invoke("file:reveal", filePath),
   cancelExport: () => ipcRenderer.invoke("render:cancel"),
   onExportProgress: (callback: (progress: number) => void) => {
     const listener = (_e: unknown, value: number) => callback(value);

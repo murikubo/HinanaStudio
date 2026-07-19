@@ -357,6 +357,11 @@ ipcMain.handle("asset:create-proxy", async (_event, sourcePath: string) => {
   await fs.rename(temporary, proxyPath);
   return proxyPath;
 });
+ipcMain.handle("file:reveal", (_event, filePath: string) => {
+  if (!filePath || !existsSync(filePath)) return false;
+  shell.showItemInFolder(filePath);
+  return true;
+});
 ipcMain.handle("render:export", async (event, project: any) => {
   if (renderProcess) throw new Error("이미 렌더링 중입니다.");
   const result = await dialog.showSaveDialog({
@@ -430,12 +435,23 @@ ipcMain.handle("render:export", async (event, project: any) => {
       );
     else args.push("-i", asset.path);
   });
-  const total = Math.max(
+  const timelineTotal = Math.max(
     1,
     ...project.clips.map((c: any) => c.start + c.duration),
   );
+  const requestedStart = Number(project.settings?.exportStart ?? 0);
+  const requestedEnd = Number(project.settings?.exportEnd ?? timelineTotal);
+  const rangeStart =
+    project.settings?.exportMode === "range"
+      ? Math.max(0, Math.min(timelineTotal - 0.001, requestedStart))
+      : 0;
+  const rangeEnd =
+    project.settings?.exportMode === "range"
+      ? Math.max(rangeStart + 0.001, Math.min(timelineTotal, requestedEnd))
+      : timelineTotal;
+  const total = rangeEnd - rangeStart;
   filters.push(
-    `color=c=0x181a20:s=${width}x${height}:r=${fps}:d=${total}[base0]`,
+    `color=c=0x181a20:s=${width}x${height}:r=${fps}:d=${timelineTotal}[base0]`,
   );
   let base = "base0",
     visualIndex = 0;
@@ -725,13 +741,27 @@ ipcMain.handle("render:export", async (event, project: any) => {
     filters.push(
       `${audioLabels.join("")}amix=inputs=${audioLabels.length}:normalize=0:duration=longest[aout]`,
     );
+  if (rangeStart > 0 || rangeEnd < timelineTotal) {
+    filters.push(
+      `[${base}]trim=start=${rangeStart}:end=${rangeEnd},setpts=PTS-STARTPTS[vexport]`,
+    );
+    base = "vexport";
+    if (audioLabels.length)
+      filters.push(
+        `[aout]atrim=start=${rangeStart}:end=${rangeEnd},asetpts=PTS-STARTPTS[aexport]`,
+      );
+  }
   // Passing a large filter graph directly on Windows can exceed or destabilize
   // the process command line once captions, masks and motion are combined.
   // A UTF-8 filter script keeps the command line short on every platform.
   const filterScriptPath = path.join(renderTempDir, "filter-complex.txt");
   await fs.writeFile(filterScriptPath, filters.join(";"), "utf8");
   args.push("-filter_complex_script", filterScriptPath, "-map", `[${base}]`);
-  if (audioLabels.length) args.push("-map", "[aout]");
+  if (audioLabels.length)
+    args.push(
+      "-map",
+      rangeStart > 0 || rangeEnd < timelineTotal ? "[aexport]" : "[aout]",
+    );
   const encoderList =
     spawnSync(ffmpegPath, ["-hide_banner", "-encoders"], {
       encoding: "utf8",
