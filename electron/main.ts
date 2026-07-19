@@ -360,7 +360,7 @@ ipcMain.handle("render:export", async (event, project: any) => {
       ? `${motion.startRotation}+${motion.endRotation - motion.startRotation}*${motionProgress}`
       : String(clip.rotation ?? 0);
     filters.push(
-      `[${sourceLabel}]scale=w='iw*(${scaleExpression})':h='ih*(${scaleExpression})':eval=frame,colorchannelmixer=aa=${opacity}${rotationExpression !== "0" ? `,rotate='(${rotationExpression})*PI/180':c=none:${motion ? "ow=hypot(iw\,ih):oh=ow" : "ow=rotw(iw):oh=roth(ih)"}` : ""}[${prep}]`,
+      `[${sourceLabel}]scale=w='iw*(${scaleExpression})':h='ih*(${scaleExpression})':eval=frame,colorchannelmixer=aa=${opacity}${rotationExpression !== "0" ? `,rotate='(${rotationExpression})*PI/180':c=none:${motion ? "ow='hypot(iw,ih)':oh=ow" : "ow=rotw(iw):oh=roth(ih)"}` : ""}[${prep}]`,
     );
     const xPercent = motion
         ? `${motion.startX / 100}+${(motion.endX - motion.startX) / 100}*${motionProgress}`
@@ -471,7 +471,12 @@ ipcMain.handle("render:export", async (event, project: any) => {
     filters.push(
       `${audioLabels.join("")}amix=inputs=${audioLabels.length}:normalize=0:duration=longest[aout]`,
     );
-  args.push("-filter_complex", filters.join(";"), "-map", `[${base}]`);
+  // Passing a large filter graph directly on Windows can exceed or destabilize
+  // the process command line once captions, masks and motion are combined.
+  // A UTF-8 filter script keeps the command line short on every platform.
+  const filterScriptPath = path.join(renderTempDir, "filter-complex.txt");
+  await fs.writeFile(filterScriptPath, filters.join(";"), "utf8");
+  args.push("-filter_complex_script", filterScriptPath, "-map", `[${base}]`);
   if (audioLabels.length) args.push("-map", "[aout]");
   const encoderList =
     spawnSync(ffmpegPath, ["-hide_banner", "-encoders"], {
