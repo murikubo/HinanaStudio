@@ -1426,8 +1426,7 @@ main {
   position: absolute;
   z-index: 35;
   border: 2px dashed #ffd35a;
-  cursor: move;
-  pointer-events: auto;
+  pointer-events: none;
 }
 .crop-editor.ellipse {
   border-radius: 50%;
@@ -1437,6 +1436,21 @@ main {
   background: #ffd35a;
   border: 1px solid #17181d;
   z-index: 2;
+  pointer-events: auto;
+}
+.crop-move {
+  position: absolute;
+  left: 50%;
+  top: 5px;
+  width: 44px;
+  height: 10px;
+  transform: translateX(-50%);
+  border: 1px solid #17181d;
+  border-radius: 3px;
+  background: #ffd35a;
+  cursor: move;
+  pointer-events: auto;
+  z-index: 3;
 }
 .crop-handle.left,
 .crop-handle.right {

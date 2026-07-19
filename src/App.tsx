@@ -2059,8 +2059,12 @@ export default function App() {
                           right: `${c.crop.right}%`,
                           bottom: `${c.crop.bottom}%`,
                         }}
-                        onPointerDown={(e) => beginCropEdit(e, c, "move")}
                       >
+                        <i
+                          className="crop-move"
+                          title="자르기 영역 이동"
+                          onPointerDown={(e) => beginCropEdit(e, c, "move")}
+                        />
                         {(["left", "right", "top", "bottom"] as const).map(
                           (side) => (
                             <i
