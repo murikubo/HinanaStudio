@@ -1,35 +1,103 @@
-# Hinana Studio
+# HINANA STUDIO
 
-Windows용 영상 편집기 프로토타입입니다. React + TypeScript로 편집 UI를 구성하고 Electron으로 데스크톱 기능을 연결합니다.
+HINANA STUDIO는 React, TypeScript, Electron, FFmpeg로 개발 중인 크로스 플랫폼 데스크톱 영상 편집기입니다.
 
-## 실행
+현재 버전은 **Ver. 1.0.0 Alpha**입니다. Windows x64와 Apple Silicon macOS에서 개발·테스트하고 있으며, 아직 정식 배포판이 아닙니다.
 
-```powershell
-npm install
+## 주요 기능
+
+- 이미지, 영상, 음원 드래그 앤 드롭 및 미디어 보관함
+- 영상·이미지·자막·오디오 다중 트랙 타임라인
+- 클립 이동, 길이 조절, 분할, 삭제 및 동적 레이어 추가·제거
+- 미리보기 재생, 탐색, 오디오 파형, 볼륨 및 페이드 인·아웃
+- 이미지·영상 위치, 크기, 회전, 투명도 및 화면 맞춤
+- 자르기, 사각형·타원 마스크, 전체·부분 모자이크와 블러
+- 레이어 맨 앞으로·맨 뒤로 보내기
+- 자막 위치·폭·글꼴·색상·배경·테두리·그림자 편집
+- 직선 프리셋, 구간 지정 및 자유 경로 이미지 모션
+- 실행 취소·다시 실행과 자동 복구 저장
+- 해상도, FPS 및 내보내기 품질 설정
+- FFmpeg 기반 MP4(H.264/AAC) 내보내기와 하드웨어 인코더 자동 선택
+- 미디어를 포함하는 단일 `.hinana` 휴대용 프로젝트 패키지
+
+## 개발 실행
+
+Node.js와 npm이 필요합니다. 저장소를 받은 뒤 운영체제에서 직접 의존성을 설치하세요. 다른 OS에서 생성한 `node_modules`를 복사하면 안 됩니다.
+
+```bash
+npm ci
 npm run dev
 ```
 
-프로덕션 빌드를 확인하려면 다음을 실행합니다.
+일반 빌드 검사는 다음 명령으로 실행합니다.
 
-```powershell
+```bash
 npm run build
-npm start
 ```
 
-## 현재 구현
+## Windows x64 빌드
 
-- 영상, 이미지, 음원 드래그 앤 드롭 및 미디어 보관함
-- 비디오/텍스트/오디오 다중 트랙 타임라인
-- 재생 헤드 이동과 기본 재생 제어
-- 자막 추가, 글자 크기/색상/투명도 설정
-- 자막 배경 색상/투명도 설정
-- `.hinana` 프로젝트 저장 및 불러오기
-- 가져온 로컬 이미지/영상 미리보기
-- 실제 오디오 파형과 클립 볼륨, 페이드 인·아웃
-- 영상·이미지 위치, 크기, 회전, 투명도 편집
-- 실행 취소·다시 실행 및 자동 복구 저장
-- 원본 파일 경로를 포함한 프로젝트 저장
-- 해상도와 FPS 설정
-- 포함된 FFmpeg를 이용한 MP4(H.264/AAC) 내보내기, 진행률 및 취소
+Windows에서 실행하세요.
 
-Windows 설치용 EXE 패키징은 이후 개발 단계에서 진행할 예정입니다.
+```powershell
+git pull
+npm ci
+npm run dist:win
+```
+
+결과:
+
+```text
+release/HINANA-STUDIO-1.0.0-alpha.1-x64.exe
+```
+
+## Apple Silicon macOS 빌드
+
+Apple Silicon Mac에서 실행하세요.
+
+```bash
+git pull
+npm ci
+npm run dist:mac
+```
+
+결과:
+
+```text
+release/HINANA-STUDIO-1.0.0-alpha.1-arm64.dmg
+release/HINANA-STUDIO-1.0.0-alpha.1-arm64.zip
+```
+
+의존성이나 Electron·FFmpeg 환경이 꼬인 경우에만 완전히 다시 설치합니다.
+
+```bash
+rm -rf node_modules
+npm ci
+npm run dist:mac
+```
+
+## 프로젝트 파일
+
+새로 저장되는 `.hinana` 파일은 편집 정보와 사용한 이미지·영상·음원을 함께 보관하는 단일 패키지입니다. 따라서 파일 하나를 Windows와 macOS 사이에 옮겨 열 수 있습니다.
+
+패키지 포맷에는 다음 정보가 포함됩니다.
+
+- `formatVersion`
+- `project.json`
+- `assets/`
+- 원본 파일명, 미디어 종류와 크기
+- HINANA STUDIO 앱 버전
+- 향후 썸네일 확장을 위한 메타데이터
+
+기존 JSON 방식과 패키지 포맷 1의 `.hinana` 파일도 계속 열 수 있습니다. 미디어를 포함하므로 프로젝트 파일 크기는 원본 미디어 전체 용량과 비슷할 수 있습니다.
+
+## 배포 시 주의사항
+
+- 현재 Windows 설치 파일에는 코드 서명 인증서가 없어 SmartScreen 경고가 나타날 수 있습니다.
+- 현재 macOS 앱은 Developer ID 서명과 Apple 공증이 없어 Gatekeeper 경고가 나타날 수 있습니다.
+- macOS Intel(x64) 배포판은 아직 빌드 대상에 포함하지 않았습니다.
+- `dist/`와 `release/`는 생성 결과물이므로 Git 저장소에 포함하지 않습니다.
+
+## 개발/제작
+
+비나래 · [GitHub](https://github.com/murikubo)
