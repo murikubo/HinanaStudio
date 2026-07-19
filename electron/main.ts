@@ -382,6 +382,21 @@ ipcMain.handle("render:export", async (event, project: any) => {
     // while it is visible. Keeping a single min() avoids nested comma escaping
     // differences between FFmpeg builds on Windows and macOS.
     const motionProgress = `min(1\\,(t-${clip.start})/${Math.max(0.001, clip.duration * motionEndProgress)})`;
+    const pathExpression = (key: "x" | "y") => {
+      const points = Array.isArray(motion?.path) ? motion.path : [];
+      if (points.length < 2) return null;
+      let expression = String(points[points.length - 1][key] / 100);
+      for (let index = points.length - 1; index > 0; index -= 1) {
+        const previous = points[index - 1];
+        const current = points[index];
+        const span = Math.max(0.0001, current.progress - previous.progress);
+        const start = previous[key] / 100;
+        const delta = (current[key] - previous[key]) / 100;
+        const segment = `${start}+${delta}*(${motionProgress}-${previous.progress})/${span}`;
+        expression = `if(lte(${motionProgress}\\,${current.progress})\\,${segment}\\,${expression})`;
+      }
+      return expression;
+    };
     const scaleExpression = motion
       ? `${motion.startScale / 100}+${(motion.endScale - motion.startScale) / 100}*${motionProgress}`
       : String(scale);
@@ -392,10 +407,12 @@ ipcMain.handle("render:export", async (event, project: any) => {
       `[${sourceLabel}]scale=w='iw*(${scaleExpression})':h='ih*(${scaleExpression})':eval=frame,colorchannelmixer=aa=${opacity}${rotationExpression !== "0" ? `,rotate='(${rotationExpression})*PI/180':c=none:${motion ? "ow='hypot(iw,ih)':oh=ow" : "ow=rotw(iw):oh=roth(ih)"}` : ""}[${prep}]`,
     );
     const xPercent = motion
-        ? `${motion.startX / 100}+${(motion.endX - motion.startX) / 100}*${motionProgress}`
+        ? (pathExpression("x") ??
+          `${motion.startX / 100}+${(motion.endX - motion.startX) / 100}*${motionProgress}`)
         : String((clip.x ?? 50) / 100),
       yPercent = motion
-        ? `${motion.startY / 100}+${(motion.endY - motion.startY) / 100}*${motionProgress}`
+        ? (pathExpression("y") ??
+          `${motion.startY / 100}+${(motion.endY - motion.startY) / 100}*${motionProgress}`)
         : String((clip.y ?? 50) / 100),
       x = `W*(${xPercent})-w/2`,
       y = `H*(${yPercent})-h/2`;

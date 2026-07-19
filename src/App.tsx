@@ -224,6 +224,7 @@ type Clip = {
     endRotation: number;
     /** Normalized clip position where the end pose is reached. */
     endProgress?: number;
+    path?: { progress: number; x: number; y: number }[];
   };
   mosaicRegion?: {
     x: number;
@@ -284,7 +285,9 @@ export default function App() {
     exportPreset: "balanced" as "fast" | "balanced" | "quality",
   });
   const [renderProgress, setRenderProgress] = useState<number | null>(null);
-  const [motionEdit, setMotionEdit] = useState<"start" | "end" | null>(null);
+  const [motionEdit, setMotionEdit] = useState<"start" | "end" | "path" | null>(
+    null,
+  );
   const [renderEncoder, setRenderEncoder] = useState("");
   const [showAbout, setShowAbout] = useState(false);
   const [showProjectMenu, setShowProjectMenu] = useState(false);
@@ -324,9 +327,26 @@ export default function App() {
     );
     const lerp = (start: number, end: number) =>
       start + (end - start) * progress;
+    const path = clip.motion.path;
+    let pathPosition: { x: number; y: number } | undefined;
+    if (path && path.length > 1) {
+      const nextIndex = path.findIndex((point) => point.progress >= progress);
+      const next = path[nextIndex < 0 ? path.length - 1 : nextIndex];
+      const previous =
+        path[Math.max(0, (nextIndex < 0 ? path.length : nextIndex) - 1)];
+      const segment = Math.max(0.0001, next.progress - previous.progress);
+      const local = Math.max(
+        0,
+        Math.min(1, (progress - previous.progress) / segment),
+      );
+      pathPosition = {
+        x: previous.x + (next.x - previous.x) * local,
+        y: previous.y + (next.y - previous.y) * local,
+      };
+    }
     return {
-      x: lerp(clip.motion.startX, clip.motion.endX),
-      y: lerp(clip.motion.startY, clip.motion.endY),
+      x: pathPosition?.x ?? lerp(clip.motion.startX, clip.motion.endX),
+      y: pathPosition?.y ?? lerp(clip.motion.startY, clip.motion.endY),
       scale: lerp(clip.motion.startScale, clip.motion.endScale),
       rotation: lerp(clip.motion.startRotation, clip.motion.endRotation),
     };
@@ -1088,6 +1108,64 @@ export default function App() {
         ),
       );
     };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
+  const beginMotionPathDraw = (e: React.PointerEvent, clip: Clip) => {
+    if (!clip.motion) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const canvas = canvasRef.current?.getBoundingClientRect();
+    if (!canvas) return;
+    const points: { x: number; y: number }[] = [];
+    const addPoint = (clientX: number, clientY: number) => {
+      const point = {
+        x: Math.max(
+          -50,
+          Math.min(150, ((clientX - canvas.left) / canvas.width) * 100),
+        ),
+        y: Math.max(
+          -50,
+          Math.min(150, ((clientY - canvas.top) / canvas.height) * 100),
+        ),
+      };
+      const last = points[points.length - 1];
+      if (last && Math.hypot(point.x - last.x, point.y - last.y) < 0.8) return;
+      points.push(point);
+      const sampled =
+        points.length <= 40
+          ? points
+          : points.filter((_, index) => index % 2 === 0);
+      const path = sampled.map((item, index) => ({
+        ...item,
+        progress: sampled.length === 1 ? 0 : index / (sampled.length - 1),
+      }));
+      setClips((items) =>
+        items.map((item) =>
+          item.id === clip.id && item.motion
+            ? {
+                ...item,
+                motion: {
+                  ...item.motion,
+                  preset: "custom",
+                  path,
+                  startX: path[0].x,
+                  startY: path[0].y,
+                  endX: path[path.length - 1].x,
+                  endY: path[path.length - 1].y,
+                },
+              }
+            : item,
+        ),
+      );
+    };
+    addPoint(e.clientX, e.clientY);
+    const move = (event: PointerEvent) =>
+      addPoint(event.clientX, event.clientY);
     const up = () => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
@@ -2255,13 +2333,23 @@ export default function App() {
                     {selected === c.id && motionEdit && c.motion && (
                       <div
                         className="motion-drag-surface"
-                        title="드래그하여 모션 위치 조절"
-                        onPointerDown={(e) => beginMediaDrag(e, c)}
+                        title={
+                          motionEdit === "path"
+                            ? "이동 경로 그리기"
+                            : "드래그하여 모션 위치 조절"
+                        }
+                        onPointerDown={(e) =>
+                          motionEdit === "path"
+                            ? beginMotionPathDraw(e, c)
+                            : beginMediaDrag(e, c)
+                        }
                       >
                         <span>
                           {motionEdit === "start"
                             ? "시작 위치 편집"
-                            : "현재 프레임 도착 위치 편집"}
+                            : motionEdit === "path"
+                              ? "마우스로 이동 경로 그리기"
+                              : "현재 프레임 도착 위치 편집"}
                         </span>
                       </div>
                     )}
@@ -2797,11 +2885,16 @@ export default function App() {
                         >
                           전체 모션 이동
                         </button>
+                        <button
+                          className={motionEdit === "path" ? "active" : ""}
+                          onClick={() => setMotionEdit("path")}
+                        >
+                          경로 직접 그리기
+                        </button>
                       </div>
                       <p className="motion-edit-hint">
-                        재생 헤드를 원하는 시점에 놓고 ‘현재 프레임 도착점’을
-                        누른 뒤 이미지를 드래그하세요. 그 시점에 도착한 후에는
-                        위치가 유지됩니다.
+                        ‘경로 직접 그리기’를 누르고 미리보기에서 U자나 곡선을
+                        드래그하면 이미지가 그 경로를 따라 이동합니다.
                       </p>
                       {(
                         [
