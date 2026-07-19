@@ -7,7 +7,13 @@ import {
   MenuItemConstructorOptions,
   protocol,
 } from "electron";
-import { existsSync, promises as fs } from "fs";
+import {
+  createReadStream,
+  createWriteStream,
+  existsSync,
+  promises as fs,
+} from "fs";
+import { pipeline } from "stream/promises";
 import path from "path";
 import os from "os";
 import {
@@ -19,6 +25,92 @@ const ffmpegPath = require("ffmpeg-static") as string;
 let renderProcess: ChildProcessWithoutNullStreams | null = null;
 let renderCancelled = false;
 let currentProjectPath: string | null = null;
+const PACKAGE_MAGIC = Buffer.from("HINANA-PKG1\n", "ascii");
+
+const writeProjectPackage = async (targetPath: string, data: string) => {
+  const project = JSON.parse(data);
+  const entries: {
+    assetId: string;
+    name: string;
+    size: number;
+    source: string;
+  }[] = [];
+  for (const asset of project.assets || []) {
+    if (!asset.path || !existsSync(asset.path)) continue;
+    const stat = await fs.stat(asset.path);
+    if (!stat.isFile()) continue;
+    const extension = path.extname(asset.path);
+    const name = `${String(asset.id).replace(/[^a-zA-Z0-9_-]/g, "_")}${extension}`;
+    entries.push({
+      assetId: asset.id,
+      name,
+      size: stat.size,
+      source: asset.path,
+    });
+    asset.path = `bundle:${name}`;
+  }
+  const header = Buffer.from(
+    JSON.stringify({
+      format: 1,
+      project,
+      entries: entries.map(({ source: _source, ...entry }) => entry),
+    }),
+    "utf8",
+  );
+  const length = Buffer.alloc(4);
+  length.writeUInt32LE(header.length);
+  const temporary = `${targetPath}.writing-${process.pid}`;
+  await fs.writeFile(temporary, Buffer.concat([PACKAGE_MAGIC, length, header]));
+  for (const entry of entries)
+    await pipeline(
+      createReadStream(entry.source),
+      createWriteStream(temporary, { flags: "a" }),
+    );
+  await fs.copyFile(temporary, targetPath);
+  await fs.unlink(temporary);
+};
+
+const readProjectPackage = async (filePath: string) => {
+  const handle = await fs.open(filePath, "r");
+  try {
+    const prefix = Buffer.alloc(PACKAGE_MAGIC.length + 4);
+    await handle.read(prefix, 0, prefix.length, 0);
+    if (!prefix.subarray(0, PACKAGE_MAGIC.length).equals(PACKAGE_MAGIC))
+      return await fs.readFile(filePath, "utf8");
+    const headerLength = prefix.readUInt32LE(PACKAGE_MAGIC.length);
+    const headerBuffer = Buffer.alloc(headerLength);
+    await handle.read(headerBuffer, 0, headerLength, prefix.length);
+    const packageData = JSON.parse(headerBuffer.toString("utf8"));
+    const extractDir = await fs.mkdtemp(
+      path.join(os.tmpdir(), "hinana-project-"),
+    );
+    let offset = prefix.length + headerLength;
+    const extracted = new Map<string, string>();
+    for (const entry of packageData.entries || []) {
+      const destination = path.join(extractDir, path.basename(entry.name));
+      if (entry.size > 0)
+        await pipeline(
+          createReadStream(filePath, {
+            start: offset,
+            end: offset + entry.size - 1,
+          }),
+          createWriteStream(destination),
+        );
+      else await fs.writeFile(destination, "");
+      offset += entry.size;
+      extracted.set(entry.assetId, destination);
+    }
+    packageData.project.assets = (packageData.project.assets || []).map(
+      (asset: any) => ({
+        ...asset,
+        path: extracted.get(asset.id) || asset.path,
+      }),
+    );
+    return JSON.stringify(packageData.project);
+  } finally {
+    await handle.close();
+  }
+};
 
 // Set this before Electron creates the default macOS application menu.
 app.setName("HINANA STUDIO");
@@ -125,7 +217,7 @@ ipcMain.handle("project:save", async (_event, data: string) => {
     if (result.canceled || !result.filePath) return null;
     currentProjectPath = result.filePath;
   }
-  await fs.writeFile(currentProjectPath, data, "utf8");
+  await writeProjectPackage(currentProjectPath, data);
   return currentProjectPath;
 });
 ipcMain.handle("project:save-as", async (_event, data: string) => {
@@ -136,7 +228,7 @@ ipcMain.handle("project:save-as", async (_event, data: string) => {
   });
   if (result.canceled || !result.filePath) return null;
   currentProjectPath = result.filePath;
-  await fs.writeFile(currentProjectPath, data, "utf8");
+  await writeProjectPackage(currentProjectPath, data);
   return currentProjectPath;
 });
 ipcMain.handle("project:new", () => {
@@ -153,7 +245,7 @@ ipcMain.handle("project:open", async () => {
   currentProjectPath = result.filePaths[0];
   return {
     path: result.filePaths[0],
-    data: await fs.readFile(result.filePaths[0], "utf8"),
+    data: await readProjectPackage(result.filePaths[0]),
   };
 });
 ipcMain.handle("asset:relink", async (_event, kind: string) => {
