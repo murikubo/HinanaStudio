@@ -2,6 +2,7 @@
   "name": "hinana-video-editor",
   "version": "1.0.0-alpha.1",
   "private": true,
+  "license": "UNLICENSED",
   "description": "Hinana desktop video editor prototype",
   "main": "dist-electron/main.js",
   "build": {

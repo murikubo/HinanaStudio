@@ -101,3 +101,9 @@ npm run dist:mac
 ## 개발/제작
 
 비나래 · [GitHub](https://github.com/murikubo)
+
+## 라이선스
+
+Copyright © 2026 비나래. All rights reserved.
+
+HINANA STUDIO는 오픈소스 소프트웨어가 아닙니다. 공식 바이너리는 무료로 사용할 수 있고 공식 앱으로 만든 결과물의 권리는 사용자에게 있습니다. 다만 소스 코드의 수정·재배포·리브랜딩, 바이너리 재배포 또는 별도 서비스 제공 권한은 부여되지 않습니다. 자세한 내용은 [LICENSE](LICENSE)를 확인하세요.
