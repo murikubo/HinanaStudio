@@ -181,7 +181,18 @@ ipcMain.handle("render:export", async (event, project: any) => {
   mediaClips.forEach((clip: any) => {
     const asset: any = assets.get(clip.assetId);
     if (clip.kind === "image")
-      args.push("-loop", "1", "-t", String(clip.duration), "-i", asset.path);
+      args.push(
+        "-f",
+        "image2",
+        "-loop",
+        "1",
+        "-framerate",
+        String(fps),
+        "-t",
+        String(clip.duration),
+        "-i",
+        asset.path,
+      );
     else args.push("-i", asset.path);
   });
   const total = Math.max(
