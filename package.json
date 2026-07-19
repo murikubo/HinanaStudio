@@ -1,47 +1,30 @@
 {
   "name": "hinana-video-editor",
-  "version": "1.0.0-alpha.1",
+  "version": "1.0.0-beta.1",
   "private": true,
   "license": "UNLICENSED",
-  "description": "Hinana desktop video editor prototype",
+  "author": "비나래",
+  "description": "Hinana desktop video editor beta",
   "main": "dist-electron/main.js",
   "build": {
     "appId": "studio.hinana.HinanaStudio",
     "productName": "HINANA STUDIO",
-    "directories": {
-      "output": "release"
-    },
+    "directories": { "output": "release" },
     "icon": "HinanaStudioIcon.png",
     "extraResources": [
-      {
-        "from": "HinanaStudioIcon.png",
-        "to": "HinanaStudioIcon.png"
-      }
+      { "from": "HinanaStudioIcon.png", "to": "HinanaStudioIcon.png" }
     ],
     "asar": true,
-    "asarUnpack": [
-      "node_modules/ffmpeg-static/**"
-    ],
+    "asarUnpack": ["node_modules/ffmpeg-static/**"],
     "win": {
-      "target": [
-        {
-          "target": "nsis",
-          "arch": ["x64"]
-        }
-      ],
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
       "icon": "HinanaStudioIcon.png",
       "artifactName": "HINANA-STUDIO-${version}-${arch}.${ext}"
     },
     "mac": {
       "target": [
-        {
-          "target": "dmg",
-          "arch": ["arm64"]
-        },
-        {
-          "target": "zip",
-          "arch": ["arm64"]
-        }
+        { "target": "dmg", "arch": ["arm64"] },
+        { "target": "zip", "arch": ["arm64"] }
       ],
       "icon": "HinanaStudioIcon.png",
       "category": "public.app-category.video",

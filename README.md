@@ -2,7 +2,7 @@
 
 HINANA STUDIO는 React, TypeScript, Electron, FFmpeg로 개발 중인 크로스 플랫폼 데스크톱 영상 편집기입니다.
 
-현재 버전은 **Ver. 1.0.0 Alpha**입니다. Windows x64와 Apple Silicon macOS에서 개발·테스트하고 있으며, 아직 정식 배포판이 아닙니다.
+현재 버전은 **Ver. 1.0.0 Beta 1**입니다. Windows x64와 Apple Silicon macOS에서 개발·테스트하고 있으며, 아직 정식 배포판이 아닙니다.
 
 ## 주요 기능
 
@@ -48,7 +48,7 @@ npm run dist:win
 결과:
 
 ```text
-release/HINANA-STUDIO-1.0.0-alpha.1-x64.exe
+release/HINANA-STUDIO-1.0.0-beta.1-x64.exe
 ```
 
 ## Apple Silicon macOS 빌드
@@ -64,8 +64,8 @@ npm run dist:mac
 결과:
 
 ```text
-release/HINANA-STUDIO-1.0.0-alpha.1-arm64.dmg
-release/HINANA-STUDIO-1.0.0-alpha.1-arm64.zip
+release/HINANA-STUDIO-1.0.0-beta.1-arm64.dmg
+release/HINANA-STUDIO-1.0.0-beta.1-arm64.zip
 ```
 
 의존성이나 Electron·FFmpeg 환경이 꼬인 경우에만 완전히 다시 설치합니다.

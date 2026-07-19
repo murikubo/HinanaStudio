@@ -3791,7 +3791,7 @@ export default function App() {
               </div>
               <div>
                 <dt>버전</dt>
-                <dd>Ver. 1.0.0 Alpha</dd>
+                <dd>Ver. 1.0.0 Beta 1</dd>
               </div>
             </dl>
           </div>

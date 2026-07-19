@@ -9,6 +9,7 @@ import {
   shell,
 } from "electron";
 import {
+  appendFileSync,
   createReadStream,
   createWriteStream,
   existsSync,
@@ -22,6 +23,19 @@ import {
   spawnSync,
   ChildProcessWithoutNullStreams,
 } from "child_process";
+const startupLogPath = path.join(app.getPath("userData"), "startup.log");
+const startupLog = (message: string) => {
+  try {
+    appendFileSync(startupLogPath, `${new Date().toISOString()} ${message}\n`);
+  } catch {}
+};
+process.on("uncaughtException", (error) =>
+  startupLog(`uncaughtException ${error.stack || error.message}`),
+);
+process.on("unhandledRejection", (error) =>
+  startupLog(`unhandledRejection ${String(error)}`),
+);
+startupLog(`main loaded packaged=${app.isPackaged} platform=${process.platform}`);
 const packagedFfmpegPath = require("ffmpeg-static") as string;
 const ffmpegPath = app.isPackaged
   ? packagedFfmpegPath.replace("app.asar", "app.asar.unpacked")
@@ -239,6 +253,7 @@ if (!app.isPackaged) {
 }
 
 const createWindow = () => {
+  startupLog("createWindow begin");
   const icon = getAppIconPath();
   const win = new BrowserWindow({
     width: 1500,
@@ -269,6 +284,13 @@ const createWindow = () => {
     (app.isPackaged ? "" : "http://localhost:5173");
   if (devUrl) win.loadURL(devUrl);
   else win.loadFile(path.join(__dirname, "../dist/index.html"));
+  win.webContents.on("did-finish-load", () => startupLog("renderer loaded"));
+  win.webContents.on("did-fail-load", (_event, code, description, url) =>
+    startupLog(`renderer load failed ${code} ${description} ${url}`),
+  );
+  win.webContents.on("render-process-gone", (_event, details) =>
+    startupLog(`renderer gone ${details.reason} ${details.exitCode}`),
+  );
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith("https://")) void shell.openExternal(url);
     return { action: "deny" };
