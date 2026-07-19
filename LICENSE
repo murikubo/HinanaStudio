@@ -15,10 +15,12 @@ product, remove or alter attribution, use the HINANA STUDIO name or branding
 for another product, or offer the software or a modified version as a service
 without prior written permission from the copyright holder.
 
-The permissions required to view and fork a public repository through GitHub's
-functionality remain governed by the GitHub Terms of Service. Such a fork does
-not grant permission to use, modify, publish, distribute, deploy, or rebrand
-the software beyond those Terms.
+Forking through GitHub is permitted only as provided by GitHub's platform
+features and the GitHub Terms of Service. A fork is a repository copy made
+through GitHub's service and does not grant any copyright license to use,
+modify, publish, distribute, deploy, rebrand, sublicense, or create derivative
+works from the software, except solely to the extent required by GitHub's Terms
+of Service.
 
 Third-party libraries, tools, fonts, codecs, media, and other dependencies are
 subject to their respective licenses and are not relicensed by this notice.
