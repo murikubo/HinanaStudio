@@ -334,7 +334,16 @@ ipcMain.handle("render:export", async (event, project: any) => {
   )
     candidates.push({
       label: "Apple VideoToolbox",
-      options: ["-c:v", "h264_videotoolbox", "-q:v", "65", "-allow_sw", "0"],
+      options: [
+        "-c:v",
+        "h264_videotoolbox",
+        "-b:v",
+        "8M",
+        "-realtime",
+        "1",
+        "-allow_sw",
+        "1",
+      ],
     });
   if (process.platform === "win32") {
     if (encoderList.includes("h264_nvenc"))
@@ -380,10 +389,21 @@ ipcMain.handle("render:export", async (event, project: any) => {
         ],
       });
   }
-  candidates.push({
-    label: "CPU (libx264)",
-    options: ["-c:v", "libx264", "-preset", "medium", "-crf", "20"],
-  });
+  if (encoderList.includes("libx264"))
+    candidates.push({
+      label: "CPU (libx264)",
+      options: ["-c:v", "libx264", "-preset", "medium", "-crf", "20"],
+    });
+  if (encoderList.includes("libopenh264"))
+    candidates.push({
+      label: "CPU (OpenH264)",
+      options: ["-c:v", "libopenh264", "-b:v", "8M"],
+    });
+  if (encoderList.includes("mpeg4"))
+    candidates.push({
+      label: "MP4 호환 모드 (MPEG-4)",
+      options: ["-c:v", "mpeg4", "-q:v", "3"],
+    });
   const tail = [
     "-pix_fmt",
     "yuv420p",
@@ -395,6 +415,7 @@ ipcMain.handle("render:export", async (event, project: any) => {
     "-y",
     result.filePath,
   ];
+  let lastEncoderError = "";
   const runEncoder = (encoder: Encoder) =>
     new Promise<boolean>((resolve, reject) => {
       event.sender.send("render:encoder", encoder.label);
@@ -423,6 +444,7 @@ ipcMain.handle("render:export", async (event, project: any) => {
           return reject(new Error("렌더링이 취소되었습니다"));
         if (code === 0) resolve(true);
         else {
+          lastEncoderError = errorText.trim();
           console.warn(`${encoder.label} 실패, 다음 인코더로 전환`, errorText);
           resolve(false);
         }
@@ -433,7 +455,12 @@ ipcMain.handle("render:export", async (event, project: any) => {
       if (await runEncoder(encoder)) return result.filePath;
       event.sender.send("render:progress", 0);
     }
-    throw new Error("사용 가능한 H.264 인코더가 없습니다");
+    const detail = lastEncoderError.split(/\r?\n/).slice(-12).join("\n");
+    throw new Error(
+      detail
+        ? `모든 비디오 인코더가 실패했습니다.\n${detail}`
+        : "이 FFmpeg 빌드에서 사용할 수 있는 비디오 인코더를 찾지 못했습니다.",
+    );
   } finally {
     await fs
       .rm(renderTempDir, { recursive: true, force: true })
