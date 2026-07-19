@@ -374,14 +374,20 @@ ipcMain.handle("render:export", async (event, project: any) => {
       sourceLabel = cropLabel;
     }
     const motion = clip.motion;
+    const motionStartProgress = Math.max(
+      0,
+      Math.min(0.999, motion?.startProgress ?? 0),
+    );
     const motionEndProgress = Math.max(
-      0.001,
+      motionStartProgress + 0.001,
       Math.min(1, motion?.endProgress ?? 1),
     );
-    // The prepared stream starts at clip.start, so progress cannot be negative
-    // while it is visible. Keeping a single min() avoids nested comma escaping
-    // differences between FFmpeg builds on Windows and macOS.
-    const motionProgress = `min(1\\,(t-${clip.start})/${Math.max(0.001, clip.duration * motionEndProgress)})`;
+    const motionStartTime = clip.start + clip.duration * motionStartProgress;
+    const motionSpan = Math.max(
+      0.001,
+      clip.duration * (motionEndProgress - motionStartProgress),
+    );
+    const motionProgress = `min(1\\,max(0\\,(t-${motionStartTime})/${motionSpan}))`;
     const pathExpression = (key: "x" | "y") => {
       const points = Array.isArray(motion?.path) ? motion.path : [];
       if (points.length < 2) return null;

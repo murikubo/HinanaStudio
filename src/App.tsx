@@ -222,6 +222,8 @@ type Clip = {
     endScale: number;
     startRotation: number;
     endRotation: number;
+    /** Normalized clip position where motion begins. */
+    startProgress?: number;
     /** Normalized clip position where the end pose is reached. */
     endProgress?: number;
     path?: { progress: number; x: number; y: number }[];
@@ -329,12 +331,21 @@ export default function App() {
         scale: clip.scale ?? 100,
         rotation: clip.rotation ?? 0,
       };
-    const endProgress = Math.max(0.001, clip.motion.endProgress ?? 1);
+    const startProgress = Math.max(
+      0,
+      Math.min(0.999, clip.motion.startProgress ?? 0),
+    );
+    const endProgress = Math.max(
+      startProgress + 0.001,
+      clip.motion.endProgress ?? 1,
+    );
+    const clipProgress = (time - clip.start) / Math.max(0.001, clip.duration);
     const progress = Math.max(
       0,
       Math.min(
         1,
-        (time - clip.start) / Math.max(0.001, clip.duration * endProgress),
+        (clipProgress - startProgress) /
+          Math.max(0.001, endProgress - startProgress),
       ),
     );
     const lerp = (start: number, end: number) =>
@@ -389,6 +400,7 @@ export default function App() {
       endScale: preset === "zoomOut" ? scale * 0.85 : scale,
       startRotation: rotation,
       endRotation: rotation,
+      startProgress: 0,
       endProgress: 1,
     };
     setClips((items) =>
@@ -2905,10 +2917,47 @@ export default function App() {
                         >
                           경로 직접 그리기
                         </button>
+                        <button
+                          onClick={() =>
+                            update({
+                              motion: {
+                                ...active.motion!,
+                                startProgress: Math.max(
+                                  0,
+                                  Math.min(
+                                    (active.motion?.endProgress ?? 1) - 0.001,
+                                    (time - active.start) / active.duration,
+                                  ),
+                                ),
+                              },
+                            })
+                          }
+                        >
+                          현재 프레임부터 시작
+                        </button>
+                        <button
+                          onClick={() =>
+                            update({
+                              motion: {
+                                ...active.motion!,
+                                endProgress: Math.max(
+                                  (active.motion?.startProgress ?? 0) + 0.001,
+                                  Math.min(
+                                    1,
+                                    (time - active.start) / active.duration,
+                                  ),
+                                ),
+                              },
+                            })
+                          }
+                        >
+                          현재 프레임에서 종료
+                        </button>
                       </div>
                       <p className="motion-edit-hint">
                         ‘경로 직접 그리기’를 누르고 미리보기에서 U자나 곡선을
-                        드래그하면 이미지가 그 경로를 따라 이동합니다.
+                        드래그하세요. 재생 헤드를 옮겨 시작·종료 프레임을 각각
+                        지정하면 그 구간에서만 움직입니다.
                       </p>
                       {(
                         [
