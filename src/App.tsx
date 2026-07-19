@@ -199,6 +199,13 @@ type Clip = {
   blur?: number;
   grayscale?: boolean;
   mosaic?: number;
+  crop?: {
+    left: number;
+    top: number;
+    right: number;
+    bottom: number;
+    shape: "rectangle" | "ellipse";
+  };
   mosaicRegion?: {
     x: number;
     y: number;
@@ -1574,6 +1581,79 @@ export default function App() {
                 onChange={(e) => update({ mosaic: +e.target.value })}
               />
               <div className="mask-heading">
+                <b>자르기</b>
+                <span>원본을 훼손하지 않는 비파괴 자르기</span>
+              </div>
+              <button
+                className={active?.crop ? "effect-on" : ""}
+                disabled={!active || !["video", "image"].includes(active.kind)}
+                onClick={() =>
+                  update({
+                    crop: active?.crop
+                      ? undefined
+                      : {
+                          left: 0,
+                          top: 0,
+                          right: 0,
+                          bottom: 0,
+                          shape: "rectangle",
+                        },
+                  })
+                }
+              >
+                {active?.crop ? "자르기 해제" : "자르기 적용"}
+              </button>
+              {active?.crop && (
+                <>
+                  <label>자르기 모양</label>
+                  <select
+                    className="mask-select"
+                    value={active.crop.shape}
+                    onChange={(e) =>
+                      update({
+                        crop: {
+                          ...active.crop!,
+                          shape: e.target.value as "rectangle" | "ellipse",
+                        },
+                      })
+                    }
+                  >
+                    <option value="rectangle">사각형</option>
+                    <option value="ellipse">원·타원형</option>
+                  </select>
+                  {(["left", "right", "top", "bottom"] as const).map((side) => (
+                    <div key={side}>
+                      <label>
+                        {
+                          {
+                            left: "왼쪽",
+                            right: "오른쪽",
+                            top: "위",
+                            bottom: "아래",
+                          }[side]
+                        }
+                        <em>{active.crop![side]}%</em>
+                      </label>
+                      <input
+                        type="range"
+                        min="0"
+                        max="45"
+                        step="1"
+                        value={active.crop![side]}
+                        onChange={(e) =>
+                          update({
+                            crop: {
+                              ...active.crop!,
+                              [side]: +e.target.value,
+                            },
+                          })
+                        }
+                      />
+                    </div>
+                  ))}
+                </>
+              )}
+              <div className="mask-heading">
                 <b>영상 마스킹</b>
                 <span>미리보기에서 이동·크기 조절</span>
               </div>
@@ -1780,6 +1860,11 @@ export default function App() {
                       opacity: c.opacity ?? 1,
                       filter: `brightness(${c.brightness ?? 1}) contrast(${c.contrast ?? 1}) saturate(${c.grayscale ? 0 : (c.saturation ?? 1)}) blur(${c.blur ?? 0}px)`,
                       transform: `translate(-50%, -50%) rotate(${c.rotation ?? 0}deg) scale(${(c.scale ?? 100) / 100})`,
+                      clipPath: c.crop
+                        ? c.crop.shape === "ellipse"
+                          ? `ellipse(${Math.max(5, 50 - (c.crop.left + c.crop.right) / 2)}% ${Math.max(5, 50 - (c.crop.top + c.crop.bottom) / 2)}% at ${50 + (c.crop.left - c.crop.right) / 2}% ${50 + (c.crop.top - c.crop.bottom) / 2}%)`
+                          : `inset(${c.crop.top}% ${c.crop.right}% ${c.crop.bottom}% ${c.crop.left}%)`
+                        : undefined,
                     }}
                   >
                     {c.kind === "video" ? (

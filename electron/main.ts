@@ -327,7 +327,23 @@ ipcMain.handle("render:export", async (event, project: any) => {
         );
       }
     }
-    const sourceLabel = clip.mosaicRegion ? composited : raw;
+    const maskedSource = clip.mosaicRegion ? composited : raw;
+    let sourceLabel = maskedSource;
+    if (clip.crop) {
+      const crop = clip.crop;
+      const cropLabel = `crop${i}`;
+      const cropFilter = `crop=iw*${Math.max(0.1, 1 - (crop.left + crop.right) / 100)}:ih*${Math.max(0.1, 1 - (crop.top + crop.bottom) / 100)}:iw*${crop.left / 100}:ih*${crop.top / 100}`;
+      if (crop.shape === "ellipse") {
+        const ellipse =
+          "((X-W/2)*(X-W/2))/((W/2)*(W/2))+((Y-H/2)*(Y-H/2))/((H/2)*(H/2))";
+        filters.push(
+          `[${maskedSource}]${cropFilter},format=rgba,geq=a='if(lte(${ellipse},1),255,0)'[${cropLabel}]`,
+        );
+      } else {
+        filters.push(`[${maskedSource}]${cropFilter}[${cropLabel}]`);
+      }
+      sourceLabel = cropLabel;
+    }
     filters.push(
       `[${sourceLabel}]scale=iw*${scale}:ih*${scale},colorchannelmixer=aa=${opacity}${clip.rotation ? `,rotate=${clip.rotation}*PI/180:c=none:ow=rotw(iw):oh=roth(ih)` : ""}[${prep}]`,
     );
