@@ -371,7 +371,7 @@ ipcMain.handle("render:export", async (event, project: any) => {
       x = `W*(${xPercent})-w/2`,
       y = `H*(${yPercent})-h/2`;
     filters.push(
-      `[${base}][${prep}]overlay=x=${x}:y=${y}:enable='between(t,${clip.start},${clip.start + clip.duration})'[${next}]`,
+      `[${base}][${prep}]overlay=x='${x}':y='${y}':enable='between(t,${clip.start},${clip.start + clip.duration})'[${next}]`,
     );
     base = next;
   });
