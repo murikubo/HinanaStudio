@@ -1,6 +1,6 @@
 {
   "name": "hinana-video-editor",
-  "version": "0.1.0",
+  "version": "1.0.0-alpha.1",
   "private": true,
   "description": "Hinana desktop video editor prototype",
   "main": "dist-electron/main.js",
@@ -13,14 +13,37 @@
         "from": "HinanaStudioIcon.png",
         "to": "HinanaStudioIcon.png"
       }
-    ]
+    ],
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/ffmpeg-static/**"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "HinanaStudioIcon.png",
+      "artifactName": "HINANA-STUDIO-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "HINANA STUDIO"
+    }
   },
   "scripts": {
     "dev": "npm run build:electron && concurrently -k \"vite\" \"wait-on http://localhost:5173 && node scripts/launch-electron.cjs\"",
     "build:electron": "tsc -p electron/tsconfig.json",
     "build": "tsc && vite build && tsc -p electron/tsconfig.json",
     "preview": "vite preview",
-    "start": "node scripts/launch-electron.cjs"
+    "start": "node scripts/launch-electron.cjs",
+    "dist:win": "npm run build && electron-builder --win nsis --x64"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
@@ -37,6 +60,7 @@
     "@types/react-dom": "latest",
     "concurrently": "latest",
     "electron": "latest",
+    "electron-builder": "^26.15.3",
     "wait-on": "latest"
   }
 }

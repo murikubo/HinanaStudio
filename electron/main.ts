@@ -21,7 +21,10 @@ import {
   spawnSync,
   ChildProcessWithoutNullStreams,
 } from "child_process";
-const ffmpegPath = require("ffmpeg-static") as string;
+const packagedFfmpegPath = require("ffmpeg-static") as string;
+const ffmpegPath = app.isPackaged
+  ? packagedFfmpegPath.replace("app.asar", "app.asar.unpacked")
+  : packagedFfmpegPath;
 let renderProcess: ChildProcessWithoutNullStreams | null = null;
 let renderCancelled = false;
 let currentProjectPath: string | null = null;
