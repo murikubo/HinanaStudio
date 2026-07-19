@@ -1411,6 +1411,61 @@ main {
   color: #ddd;
   padding: 0 8px;
 }
+.media-resize {
+  position: absolute;
+  width: 15px;
+  height: 15px;
+  margin: 4px;
+  border: 2px solid #17181d;
+  border-radius: 3px;
+  background: #746cff;
+  cursor: nwse-resize;
+  z-index: 40;
+}
+.crop-editor {
+  position: absolute;
+  z-index: 35;
+  border: 2px dashed #ffd35a;
+  cursor: move;
+  pointer-events: auto;
+}
+.crop-editor.ellipse {
+  border-radius: 50%;
+}
+.crop-handle {
+  position: absolute;
+  background: #ffd35a;
+  border: 1px solid #17181d;
+  z-index: 2;
+}
+.crop-handle.left,
+.crop-handle.right {
+  top: 50%;
+  width: 8px;
+  height: 28px;
+  transform: translateY(-50%);
+  cursor: ew-resize;
+}
+.crop-handle.left {
+  left: 2px;
+}
+.crop-handle.right {
+  right: 2px;
+}
+.crop-handle.top,
+.crop-handle.bottom {
+  left: 50%;
+  width: 28px;
+  height: 8px;
+  transform: translateX(-50%);
+  cursor: ns-resize;
+}
+.crop-handle.top {
+  top: 2px;
+}
+.crop-handle.bottom {
+  bottom: 2px;
+}
 .logo {
   overflow: hidden;
   background: transparent;

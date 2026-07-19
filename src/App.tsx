@@ -897,6 +897,74 @@ export default function App() {
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
   };
+  const beginMediaResize = (e: React.PointerEvent, clip: Clip) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const canvas = e.currentTarget.closest(".canvas")!.getBoundingClientRect();
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startScale = clip.scale ?? 100;
+    const move = (event: PointerEvent) => {
+      const delta =
+        ((event.clientX - startX + event.clientY - startY) / canvas.width) *
+        100;
+      const scale = Math.max(5, Math.min(500, startScale + delta));
+      setClips((items) =>
+        items.map((item) => (item.id === clip.id ? { ...item, scale } : item)),
+      );
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
+  const beginCropEdit = (
+    e: React.PointerEvent,
+    clip: Clip,
+    mode: "move" | "left" | "right" | "top" | "bottom",
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!clip.crop) return;
+    const canvas = e.currentTarget.closest(".canvas")!.getBoundingClientRect();
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const start = { ...clip.crop };
+    const move = (event: PointerEvent) => {
+      const dx = ((event.clientX - startX) / canvas.width) * 100;
+      const dy = ((event.clientY - startY) / canvas.height) * 100;
+      const next = { ...start };
+      if (mode === "left")
+        next.left = Math.max(0, Math.min(90 - start.right, start.left + dx));
+      if (mode === "right")
+        next.right = Math.max(0, Math.min(90 - start.left, start.right - dx));
+      if (mode === "top")
+        next.top = Math.max(0, Math.min(90 - start.bottom, start.top + dy));
+      if (mode === "bottom")
+        next.bottom = Math.max(0, Math.min(90 - start.top, start.bottom - dy));
+      if (mode === "move") {
+        const width = 100 - start.left - start.right;
+        const height = 100 - start.top - start.bottom;
+        next.left = Math.max(0, Math.min(100 - width, start.left + dx));
+        next.right = 100 - width - next.left;
+        next.top = Math.max(0, Math.min(100 - height, start.top + dy));
+        next.bottom = 100 - height - next.top;
+      }
+      setClips((items) =>
+        items.map((item) =>
+          item.id === clip.id ? { ...item, crop: next } : item,
+        ),
+      );
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
   const beginRegionEdit = (
     e: React.PointerEvent,
     clip: Clip,
@@ -1981,6 +2049,38 @@ export default function App() {
                           />
                         )}
                       </div>
+                    )}
+                    {selected === c.id && c.crop && (
+                      <div
+                        className={`crop-editor ${c.crop.shape}`}
+                        style={{
+                          left: `${c.crop.left}%`,
+                          top: `${c.crop.top}%`,
+                          right: `${c.crop.right}%`,
+                          bottom: `${c.crop.bottom}%`,
+                        }}
+                        onPointerDown={(e) => beginCropEdit(e, c, "move")}
+                      >
+                        {(["left", "right", "top", "bottom"] as const).map(
+                          (side) => (
+                            <i
+                              key={side}
+                              className={`crop-handle ${side}`}
+                              onPointerDown={(e) => beginCropEdit(e, c, side)}
+                            />
+                          ),
+                        )}
+                      </div>
+                    )}
+                    {selected === c.id && (
+                      <i
+                        className="media-resize"
+                        style={{
+                          right: `${c.crop?.right ?? 0}%`,
+                          bottom: `${c.crop?.bottom ?? 0}%`,
+                        }}
+                        onPointerDown={(e) => beginMediaResize(e, c)}
+                      />
                     )}
                   </div>
                 );
