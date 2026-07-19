@@ -1492,6 +1492,22 @@ main {
 .crop-handle.bottom {
   bottom: 2px;
 }
+.inspector .motion-select {
+  width: calc(100% - 30px);
+}
+.motion-field {
+  display: grid;
+  grid-template-columns: 1fr 92px;
+  align-items: center;
+  padding-right: 15px;
+}
+.motion-field label {
+  margin-right: 6px;
+}
+.inspector .motion-field input[type="number"] {
+  width: 92px;
+  margin: 5px 0;
+}
 .logo {
   overflow: hidden;
   background: transparent;

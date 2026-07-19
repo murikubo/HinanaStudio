@@ -211,6 +211,17 @@ type Clip = {
     bottom: number;
     shape: "rectangle" | "ellipse";
   };
+  motion?: {
+    preset: "custom" | "zoomIn" | "zoomOut" | "panLeft" | "panRight";
+    startX: number;
+    startY: number;
+    endX: number;
+    endY: number;
+    startScale: number;
+    endScale: number;
+    startRotation: number;
+    endRotation: number;
+  };
   mosaicRegion?: {
     x: number;
     y: number;
@@ -291,6 +302,57 @@ export default function App() {
   const active = clips.find((c) => c.id === selected),
     total = Math.max(15, ...clips.map((c) => c.start + c.duration)),
     px = 75 * zoom;
+  const motionState = (clip: Clip) => {
+    if (!clip.motion)
+      return {
+        x: clip.x ?? 50,
+        y: clip.y ?? 50,
+        scale: clip.scale ?? 100,
+        rotation: clip.rotation ?? 0,
+      };
+    const progress = Math.max(
+      0,
+      Math.min(1, (time - clip.start) / Math.max(0.001, clip.duration)),
+    );
+    const lerp = (start: number, end: number) =>
+      start + (end - start) * progress;
+    return {
+      x: lerp(clip.motion.startX, clip.motion.endX),
+      y: lerp(clip.motion.startY, clip.motion.endY),
+      scale: lerp(clip.motion.startScale, clip.motion.endScale),
+      rotation: lerp(clip.motion.startRotation, clip.motion.endRotation),
+    };
+  };
+  const setMotionPreset = (preset: string) => {
+    if (!active || !["video", "image"].includes(active.kind)) return;
+    if (preset === "none") {
+      setClips((items) =>
+        items.map((item) =>
+          item.id === active.id ? { ...item, motion: undefined } : item,
+        ),
+      );
+      return;
+    }
+    const x = active.x ?? 50,
+      y = active.y ?? 50,
+      scale = active.scale ?? 100,
+      rotation = active.rotation ?? 0;
+    const motion: NonNullable<Clip["motion"]> = {
+      preset: preset as NonNullable<Clip["motion"]>["preset"],
+      startX:
+        preset === "panRight" ? x - 10 : preset === "panLeft" ? x + 10 : x,
+      endX: preset === "panRight" ? x + 10 : preset === "panLeft" ? x - 10 : x,
+      startY: y,
+      endY: y,
+      startScale: preset === "zoomIn" ? scale * 0.85 : scale,
+      endScale: preset === "zoomOut" ? scale * 0.85 : scale,
+      startRotation: rotation,
+      endRotation: rotation,
+    };
+    setClips((items) =>
+      items.map((item) => (item.id === active.id ? { ...item, motion } : item)),
+    );
+  };
   const wrapCaption = (clip: Clip) => {
     const source = clip.text || "";
     const element = canvasRef.current;
@@ -811,7 +873,29 @@ export default function App() {
         0,
         Math.min(100, startY + ((ev.clientY - sy) / canvas.height) * 100),
       );
-      setClips((v) => v.map((c) => (c.id === clip.id ? { ...c, x, y } : c)));
+      const dx = x - startX,
+        dy = y - startY;
+      setClips((v) =>
+        v.map((c) =>
+          c.id === clip.id
+            ? {
+                ...c,
+                x,
+                y,
+                motion: clip.motion
+                  ? {
+                      ...clip.motion,
+                      preset: "custom",
+                      startX: clip.motion.startX + dx,
+                      endX: clip.motion.endX + dx,
+                      startY: clip.motion.startY + dy,
+                      endY: clip.motion.endY + dy,
+                    }
+                  : undefined,
+              }
+            : c,
+        ),
+      );
     };
     const up = () => {
       window.removeEventListener("pointermove", move);
@@ -910,7 +994,22 @@ export default function App() {
         100;
       const scale = Math.max(5, Math.min(500, startScale + delta));
       setClips((items) =>
-        items.map((item) => (item.id === clip.id ? { ...item, scale } : item)),
+        items.map((item) =>
+          item.id === clip.id
+            ? {
+                ...item,
+                scale,
+                motion: clip.motion
+                  ? {
+                      ...clip.motion,
+                      preset: "custom",
+                      startScale: Math.max(5, clip.motion.startScale + delta),
+                      endScale: Math.max(5, clip.motion.endScale + delta),
+                    }
+                  : undefined,
+              }
+            : item,
+        ),
       );
     };
     const up = () => {
@@ -1933,6 +2032,7 @@ export default function App() {
               {visualClips.map((c, visualOrder) => {
                 const a = assets.find((x) => x.id === c.assetId);
                 if (!a) return null;
+                const animated = motionState(c);
                 return (
                   <div
                     className={`media-object ${selected === c.id ? "selected" : ""} ${selected && selected !== c.id ? "interaction-disabled" : ""}`}
@@ -1946,11 +2046,11 @@ export default function App() {
                     }}
                     style={{
                       zIndex: visualOrder + 1,
-                      left: `${c.x ?? 50}%`,
-                      top: `${c.y ?? 50}%`,
+                      left: `${animated.x}%`,
+                      top: `${animated.y}%`,
                       opacity: c.opacity ?? 1,
                       filter: `brightness(${c.brightness ?? 1}) contrast(${c.contrast ?? 1}) saturate(${c.grayscale ? 0 : (c.saturation ?? 1)}) blur(${c.blur ?? 0}px)`,
-                      transform: `translate(-50%, -50%) rotate(${c.rotation ?? 0}deg) scale(${(c.scale ?? 100) / 100})`,
+                      transform: `translate(-50%, -50%) rotate(${animated.rotation}deg) scale(${animated.scale / 100})`,
                       clipPath: c.crop
                         ? c.crop.shape === "ellipse"
                           ? `ellipse(${Math.max(5, 50 - (c.crop.left + c.crop.right) / 2)}% ${Math.max(5, 50 - (c.crop.top + c.crop.bottom) / 2)}% at ${50 + (c.crop.left - c.crop.right) / 2}% ${50 + (c.crop.top - c.crop.bottom) / 2}%)`
@@ -2540,6 +2640,54 @@ export default function App() {
                       초기화
                     </button>
                   </div>
+                  <div className="divider" />
+                  <h3>모션</h3>
+                  <label>모션 프리셋</label>
+                  <select
+                    className="property-select motion-select"
+                    value={active.motion?.preset ?? "none"}
+                    onChange={(e) => setMotionPreset(e.target.value)}
+                  >
+                    <option value="none">없음</option>
+                    <option value="zoomIn">천천히 확대</option>
+                    <option value="zoomOut">천천히 축소</option>
+                    <option value="panLeft">왼쪽으로 이동</option>
+                    <option value="panRight">오른쪽으로 이동</option>
+                    <option value="custom">사용자 지정</option>
+                  </select>
+                  {active.motion && (
+                    <>
+                      {(
+                        [
+                          ["startX", "시작 X"],
+                          ["endX", "종료 X"],
+                          ["startY", "시작 Y"],
+                          ["endY", "종료 Y"],
+                          ["startScale", "시작 크기"],
+                          ["endScale", "종료 크기"],
+                          ["startRotation", "시작 회전"],
+                          ["endRotation", "종료 회전"],
+                        ] as const
+                      ).map(([key, label]) => (
+                        <div className="motion-field" key={key}>
+                          <label>{label}</label>
+                          <input
+                            type="number"
+                            value={Math.round(active.motion![key] * 100) / 100}
+                            onChange={(e) =>
+                              update({
+                                motion: {
+                                  ...active.motion!,
+                                  preset: "custom",
+                                  [key]: +e.target.value,
+                                },
+                              })
+                            }
+                          />
+                        </div>
+                      ))}
+                    </>
+                  )}
                 </>
               )}
               <div className="divider" />

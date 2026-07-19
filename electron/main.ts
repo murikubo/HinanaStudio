@@ -344,11 +344,25 @@ ipcMain.handle("render:export", async (event, project: any) => {
       }
       sourceLabel = cropLabel;
     }
+    const motion = clip.motion;
+    const motionProgress = `(t-${clip.start})/${Math.max(0.001, clip.duration)}`;
+    const scaleExpression = motion
+      ? `${motion.startScale / 100}+${(motion.endScale - motion.startScale) / 100}*${motionProgress}`
+      : String(scale);
+    const rotationExpression = motion
+      ? `${motion.startRotation}+${motion.endRotation - motion.startRotation}*${motionProgress}`
+      : String(clip.rotation ?? 0);
     filters.push(
-      `[${sourceLabel}]scale=iw*${scale}:ih*${scale},colorchannelmixer=aa=${opacity}${clip.rotation ? `,rotate=${clip.rotation}*PI/180:c=none:ow=rotw(iw):oh=roth(ih)` : ""}[${prep}]`,
+      `[${sourceLabel}]scale=w='iw*(${scaleExpression})':h='ih*(${scaleExpression})':eval=frame,colorchannelmixer=aa=${opacity}${rotationExpression !== "0" ? `,rotate='(${rotationExpression})*PI/180':c=none:${motion ? "ow=hypot(iw\,ih):oh=ow" : "ow=rotw(iw):oh=roth(ih)"}` : ""}[${prep}]`,
     );
-    const x = `W*${(clip.x ?? 50) / 100}-w/2`,
-      y = `H*${(clip.y ?? 50) / 100}-h/2`;
+    const xPercent = motion
+        ? `${motion.startX / 100}+${(motion.endX - motion.startX) / 100}*${motionProgress}`
+        : String((clip.x ?? 50) / 100),
+      yPercent = motion
+        ? `${motion.startY / 100}+${(motion.endY - motion.startY) / 100}*${motionProgress}`
+        : String((clip.y ?? 50) / 100),
+      x = `W*(${xPercent})-w/2`,
+      y = `H*(${yPercent})-h/2`;
     filters.push(
       `[${base}][${prep}]overlay=x=${x}:y=${y}:enable='between(t,${clip.start},${clip.start + clip.duration})'[${next}]`,
     );
