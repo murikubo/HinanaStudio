@@ -166,6 +166,8 @@ type Asset = {
   path?: string;
   waveform?: number[];
   offline?: boolean;
+  proxyPath?: string;
+  proxyStatus?: "creating" | "ready" | "failed";
 };
 type Clip = {
   id: string;
@@ -292,6 +294,7 @@ export default function App() {
     height: 1080,
     fps: 30,
     exportPreset: "balanced" as "fast" | "balanced" | "quality",
+    useProxy: true,
   });
   const [renderProgress, setRenderProgress] = useState<number | null>(null);
   const [motionEdit, setMotionEdit] = useState<"start" | "end" | "path" | null>(
@@ -320,6 +323,10 @@ export default function App() {
     redoHistory = useRef<string[]>([]),
     restoringHistory = useRef(false);
   const mediaEls = useRef(new Map<string, HTMLMediaElement>());
+  const assetUrl = (asset: Asset) =>
+    settings.useProxy && asset.proxyPath && window.hinana
+      ? window.hinana.toFileUrl(asset.proxyPath)
+      : asset.url;
   const active = clips.find((c) => c.id === selected),
     total = Math.max(15, ...clips.map((c) => c.start + c.duration)),
     px = 75 * zoom;
@@ -1593,6 +1600,7 @@ export default function App() {
       height: 1080,
       fps: 30,
       exportPreset: "balanced",
+      useProxy: true,
     });
     setSelected("");
     setTime(0);
@@ -1624,6 +1632,33 @@ export default function App() {
       ),
     );
     flash("원본 파일을 다시 연결했습니다");
+  };
+  const createProxy = async (asset: Asset) => {
+    if (!window.hinana || asset.kind !== "video" || !asset.path) return;
+    setAssets((items) =>
+      items.map((item) =>
+        item.id === asset.id ? { ...item, proxyStatus: "creating" } : item,
+      ),
+    );
+    try {
+      const proxyPath = await window.hinana.createProxy(asset.path);
+      setAssets((items) =>
+        items.map((item) =>
+          item.id === asset.id
+            ? { ...item, proxyPath, proxyStatus: "ready" }
+            : item,
+        ),
+      );
+      flash("편집용 프록시를 만들었습니다");
+    } catch (error) {
+      console.error("Proxy creation failed", error);
+      setAssets((items) =>
+        items.map((item) =>
+          item.id === asset.id ? { ...item, proxyStatus: "failed" } : item,
+        ),
+      );
+      flash("프록시 생성에 실패했습니다");
+    }
   };
   const open = async () => {
     try {
@@ -1866,6 +1901,18 @@ export default function App() {
               <option value="balanced">균형</option>
               <option value="quality">고화질</option>
             </select>
+            <button
+              className={`proxy-toggle ${settings.useProxy ? "active" : ""}`}
+              title="미리보기에서 편집용 프록시 사용"
+              onClick={() =>
+                setSettings((current) => ({
+                  ...current,
+                  useProxy: !current.useProxy,
+                }))
+              }
+            >
+              프록시
+            </button>
           </div>
           <button title="실행 취소" onClick={undo}>
             <Undo2 />
@@ -1996,6 +2043,24 @@ export default function App() {
                             : `${a.kind.toUpperCase()} · ${a.size}`}
                         </span>
                       </div>
+                      {a.kind === "video" && (
+                        <span
+                          className={`proxy-button ${a.proxyStatus ?? ""}`}
+                          aria-disabled={a.proxyStatus === "creating" || !a.path}
+                          title="편집용 저해상도 프록시 생성"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (a.proxyStatus !== "creating" && a.path)
+                              void createProxy(a);
+                          }}
+                        >
+                          {a.proxyStatus === "creating"
+                            ? "생성 중"
+                            : a.proxyPath
+                              ? "프록시"
+                              : "P"}
+                        </span>
+                      )}
                       <FolderOpen
                         className="relink"
                         size={14}
@@ -2397,7 +2462,7 @@ export default function App() {
                           if (el) mediaEls.current.set(c.id, el);
                           else mediaEls.current.delete(c.id);
                         }}
-                        src={a.url}
+                        src={assetUrl(a)}
                         playsInline
                       />
                     ) : (
@@ -2407,13 +2472,13 @@ export default function App() {
                           objectFit: c.fit ?? "contain",
                           opacity: c.mosaic && c.mosaic > 1 ? 0 : 1,
                         }}
-                        src={a.url}
+                        src={assetUrl(a)}
                       />
                     )}
                     {c.mosaic && c.mosaic > 1 && (
                       <div className="full-mosaic">
                         <MosaicPreview
-                          url={a.url}
+                          url={assetUrl(a)}
                           kind={c.kind as "video" | "image"}
                           fit={c.fit ?? "contain"}
                           strength={c.mosaic}
@@ -2456,7 +2521,7 @@ export default function App() {
                           }}
                         >
                           <MosaicPreview
-                            url={a.url}
+                            url={assetUrl(a)}
                             kind={c.kind as "video" | "image"}
                             fit={c.fit ?? "contain"}
                             strength={c.mosaicRegion.strength}

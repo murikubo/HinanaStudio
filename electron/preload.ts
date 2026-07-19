@@ -9,6 +9,8 @@ contextBridge.exposeInMainWorld("hinana", {
   toFileUrl: (filePath: string) =>
     `hinana-media://file/${encodeURIComponent(filePath)}`,
   relinkFile: (kind: string) => ipcRenderer.invoke("asset:relink", kind),
+  createProxy: (filePath: string) =>
+    ipcRenderer.invoke("asset:create-proxy", filePath),
   exportVideo: (project: unknown) =>
     ipcRenderer.invoke("render:export", project),
   cancelExport: () => ipcRenderer.invoke("render:cancel"),

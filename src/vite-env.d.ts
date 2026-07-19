@@ -9,6 +9,7 @@ interface Window {
     getFilePath(file: File): string;
     toFileUrl(path: string): string;
     relinkFile(kind: string): Promise<string | null>;
+    createProxy(path: string): Promise<string>;
     exportVideo(project: unknown): Promise<string | null>;
     cancelExport(): Promise<boolean>;
     onExportProgress(callback: (progress: number) => void): () => void;

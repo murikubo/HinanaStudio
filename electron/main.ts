@@ -140,6 +140,8 @@ const readProjectPackage = async (filePath: string) => {
     project.assets = (project.assets || []).map((asset: any) => ({
       ...asset,
       path: extracted.get(asset.id) || asset.path,
+      proxyPath: undefined,
+      proxyStatus: undefined,
     }));
     return JSON.stringify(project);
   } finally {
@@ -310,6 +312,50 @@ ipcMain.handle("asset:relink", async (_event, kind: string) => {
     properties: ["openFile"],
   });
   return result.canceled ? null : result.filePaths[0];
+});
+ipcMain.handle("asset:create-proxy", async (_event, sourcePath: string) => {
+  if (!sourcePath || !existsSync(sourcePath))
+    throw new Error("프록시를 만들 원본 파일을 찾을 수 없습니다.");
+  const stat = await fs.stat(sourcePath);
+  const safeName = `${path.basename(sourcePath, path.extname(sourcePath)).replace(/[^a-zA-Z0-9가-힣_-]/g, "_").slice(0, 60)}-${stat.size}-${Math.round(stat.mtimeMs)}.mp4`;
+  const proxyDir = path.join(app.getPath("userData"), "proxies");
+  const proxyPath = path.join(proxyDir, safeName);
+  await fs.mkdir(proxyDir, { recursive: true });
+  if (existsSync(proxyPath)) return proxyPath;
+  const temporary = `${proxyPath}.writing-${process.pid}`;
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn(
+      ffmpegPath,
+      [
+        "-y",
+        "-i",
+        sourcePath,
+        "-vf",
+        "scale='min(1280,iw)':-2",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "ultrafast",
+        "-crf",
+        "28",
+        "-an",
+        "-movflags",
+        "+faststart",
+        "-f",
+        "mp4",
+        temporary,
+      ],
+      { windowsHide: true },
+    );
+    let error = "";
+    child.stderr.on("data", (chunk) => (error += String(chunk)));
+    child.once("error", reject);
+    child.once("close", (code) =>
+      code === 0 ? resolve() : reject(new Error(error || "프록시 생성 실패")),
+    );
+  });
+  await fs.rename(temporary, proxyPath);
+  return proxyPath;
 });
 ipcMain.handle("render:export", async (event, project: any) => {
   if (renderProcess) throw new Error("이미 렌더링 중입니다.");

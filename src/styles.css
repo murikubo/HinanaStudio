@@ -1023,6 +1023,35 @@ main {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.asset .proxy-button {
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 20px;
+  margin: 0;
+  padding: 0 5px;
+  border: 1px solid #4b4e59;
+  border-radius: 5px;
+  color: #aeb1bb;
+  font-size: 8px;
+  cursor: pointer;
+}
+.asset .proxy-button.ready,
+.proxy-toggle.active {
+  border-color: #7068ff;
+  color: #b8b4ff;
+  background: #7068ff22;
+}
+.asset .proxy-button.creating {
+  cursor: wait;
+  opacity: 0.65;
+}
+.proxy-toggle {
+  width: auto !important;
+  padding: 0 8px !important;
+  font-size: 9px;
+}
 .asset b {
   font-size: 10px;
 }
