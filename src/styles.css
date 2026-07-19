@@ -3,11 +3,14 @@
   position: absolute;
   overflow: hidden;
   cursor: move;
-  z-index: 8;
+  z-index: 50;
   outline: 1px dashed #ffcf5a;
+  pointer-events: auto;
+  touch-action: none;
 }
 .mosaic-source {
   position: absolute;
+  pointer-events: none;
 }
 .mosaic-content {
   display: block;
@@ -27,12 +30,14 @@
   position: absolute;
   right: -1px;
   bottom: -1px;
-  width: 12px;
-  height: 12px;
+  width: 14px;
+  height: 14px;
   background: #ffcf5a;
   border: 2px solid #24262c;
   cursor: nwse-resize;
-  z-index: 10;
+  z-index: 55;
+  pointer-events: auto;
+  touch-action: none;
 }
 .project-trigger {
   position: relative;
