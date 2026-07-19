@@ -417,8 +417,14 @@ ipcMain.handle("render:export", async (event, project: any) => {
     const fontScale = width / Math.max(1, clip.previewCanvasWidth || 960);
     const fontSize = Math.max(1, (clip.fontSize || 42) * fontScale);
     const border = Math.max(1, 10 * fontScale);
+    const outlineWidth = Math.max(0, (clip.outlineWidth || 0) * fontScale);
+    const shadowDistance = Math.max(0, (clip.shadowDistance || 0) * fontScale);
+    const outlineColor = (clip.outlineColor || "#000000").replace("#", "0x");
+    const shadowColor =
+      (clip.shadowColor || "#000000").replace("#", "0x") +
+      `@${clip.shadowOpacity ?? 0.7}`;
     filters.push(
-      `[${base}]drawtext=fontfile='${koreanFont}':textfile='${escapedTextFile}':fontcolor=${clip.textColor || "white"}@${clip.opacity ?? 1}:fontsize=${fontSize}:line_spacing=${fontSize * 0.25}${supportsTextAlign ? ":text_align=C" : ""}:box=1:boxcolor=${bg}:boxborderw=${border}:x=w*${(clip.x ?? 50) / 100}-text_w/2:y=h*${(clip.y ?? 82) / 100}-text_h/2:enable='between(t,${clip.start},${clip.start + clip.duration})'[${next}]`,
+      `[${base}]drawtext=fontfile='${koreanFont}':textfile='${escapedTextFile}':fontcolor=${clip.textColor || "white"}@${clip.opacity ?? 1}:fontsize=${fontSize}:line_spacing=${fontSize * 0.25}${supportsTextAlign ? ":text_align=C" : ""}:borderw=${outlineWidth}:bordercolor=${outlineColor}:shadowx=${shadowDistance}:shadowy=${shadowDistance}:shadowcolor=${shadowColor}:box=1:boxcolor=${bg}:boxborderw=${border}:x=w*${(clip.x ?? 50) / 100}-text_w/2:y=h*${(clip.y ?? 82) / 100}-text_h/2:enable='between(t,${clip.start},${clip.start + clip.duration})'[${next}]`,
     );
     base = next;
   }

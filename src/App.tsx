@@ -184,6 +184,11 @@ type Clip = {
   textColor?: string;
   bgColor?: string;
   bgOpacity?: number;
+  outlineColor?: string;
+  outlineWidth?: number;
+  shadowColor?: string;
+  shadowOpacity?: number;
+  shadowDistance?: number;
   x?: number;
   y?: number;
   volume?: number;
@@ -703,6 +708,18 @@ export default function App() {
     if (selected === id) setSelected("");
     setMenu(null);
     flash("클립을 제거했습니다");
+  };
+  const moveClipLayer = (id: string, direction: "front" | "back") => {
+    setClips((items) => {
+      const clip = items.find((item) => item.id === id);
+      if (!clip) return items;
+      const rest = items.filter((item) => item.id !== id);
+      return direction === "front" ? [...rest, clip] : [clip, ...rest];
+    });
+    setMenu(null);
+    flash(
+      direction === "front" ? "맨 앞으로 보냈습니다" : "맨 뒤로 보냈습니다",
+    );
   };
   const removeAsset = (id: string) => {
     if (clips.some((c) => c.assetId === id)) {
@@ -1845,7 +1862,7 @@ export default function App() {
                   <span>미디어를 추가하면 여기에 표시됩니다</span>
                 </div>
               )}
-              {visualClips.map((c) => {
+              {visualClips.map((c, visualOrder) => {
                 const a = assets.find((x) => x.id === c.assetId);
                 if (!a) return null;
                 return (
@@ -1853,8 +1870,14 @@ export default function App() {
                     className={`media-object ${selected === c.id ? "selected" : ""}`}
                     key={c.id}
                     onPointerDown={(e) => beginMediaDrag(e, c)}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setSelected(c.id);
+                      setMenu({ x: e.clientX, y: e.clientY, clipId: c.id });
+                    }}
                     style={{
-                      zIndex: 10 - c.track,
+                      zIndex: visualOrder + 1,
                       left: `${c.x ?? 50}%`,
                       top: `${c.y ?? 50}%`,
                       opacity: c.opacity ?? 1,
@@ -2028,6 +2051,11 @@ export default function App() {
                       className="caption-visual"
                       style={{
                         background: `color-mix(in srgb, ${c.bgColor} ${(c.bgOpacity || 0) * 100}%, transparent)`,
+                        WebkitTextStroke: `${c.outlineWidth ?? 0}px ${c.outlineColor ?? "#000000"}`,
+                        textShadow:
+                          (c.shadowDistance ?? 0) > 0
+                            ? `${c.shadowDistance}px ${c.shadowDistance}px ${Math.max(1, (c.shadowDistance ?? 0) * 0.6)}px color-mix(in srgb, ${c.shadowColor ?? "#000000"} ${(c.shadowOpacity ?? 0.7) * 100}%, transparent)`
+                            : "none",
                       }}
                     >
                       {editingCaption === c.id ? c.text : wrapCaption(c)}
@@ -2203,6 +2231,73 @@ export default function App() {
                     step=".01"
                     value={active.opacity}
                     onChange={(e) => update({ opacity: +e.target.value })}
+                  />
+                  <div className="divider" />
+                  <h3>테두리와 그림자</h3>
+                  <div className="row">
+                    <div>
+                      <label>테두리색</label>
+                      <input
+                        className="color"
+                        type="color"
+                        value={active.outlineColor ?? "#000000"}
+                        onChange={(e) =>
+                          update({ outlineColor: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label>테두리 두께</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="12"
+                        step="1"
+                        value={active.outlineWidth ?? 0}
+                        onChange={(e) =>
+                          update({ outlineWidth: Math.max(0, +e.target.value) })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="row">
+                    <div>
+                      <label>그림자색</label>
+                      <input
+                        className="color"
+                        type="color"
+                        value={active.shadowColor ?? "#000000"}
+                        onChange={(e) =>
+                          update({ shadowColor: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label>그림자 거리</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="30"
+                        value={active.shadowDistance ?? 0}
+                        onChange={(e) =>
+                          update({
+                            shadowDistance: Math.max(0, +e.target.value),
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <label>
+                    그림자 투명도{" "}
+                    <em>{Math.round((active.shadowOpacity ?? 0.7) * 100)}%</em>
+                  </label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step=".01"
+                    value={active.shadowOpacity ?? 0.7}
+                    onChange={(e) => update({ shadowOpacity: +e.target.value })}
                   />
                   <div className="divider" />
                   <h3>자막 배경</h3>
@@ -2632,9 +2727,23 @@ export default function App() {
           onPointerDown={(e) => e.stopPropagation()}
         >
           {menu.clipId && (
-            <button onClick={() => removeClip(menu.clipId!)}>
-              클립 제거 <span>Delete</span>
-            </button>
+            <>
+              {["video", "image"].includes(
+                clips.find((clip) => clip.id === menu.clipId)?.kind ?? "",
+              ) && (
+                <>
+                  <button onClick={() => moveClipLayer(menu.clipId!, "front")}>
+                    맨 앞으로 보내기
+                  </button>
+                  <button onClick={() => moveClipLayer(menu.clipId!, "back")}>
+                    맨 뒤로 보내기
+                  </button>
+                </>
+              )}
+              <button onClick={() => removeClip(menu.clipId!)}>
+                클립 제거 <span>Delete</span>
+              </button>
+            </>
           )}
           {menu.assetId && (
             <button
