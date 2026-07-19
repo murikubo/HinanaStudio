@@ -13,5 +13,6 @@ interface Window {
     cancelExport(): Promise<boolean>;
     onExportProgress(callback: (progress: number) => void): () => void;
     onExportEncoder(callback: (encoder: string) => void): () => void;
+    onShowAbout(callback: () => void): () => void;
   };
 }

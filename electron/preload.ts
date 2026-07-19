@@ -22,4 +22,9 @@ contextBridge.exposeInMainWorld("hinana", {
     ipcRenderer.on("render:encoder", listener);
     return () => ipcRenderer.removeListener("render:encoder", listener);
   },
+  onShowAbout: (callback: () => void) => {
+    const listener = () => callback();
+    ipcRenderer.on("app:show-about", listener);
+    return () => ipcRenderer.removeListener("app:show-about", listener);
+  },
 });

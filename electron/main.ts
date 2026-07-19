@@ -1,4 +1,12 @@
-import { app, BrowserWindow, dialog, ipcMain, protocol } from "electron";
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  Menu,
+  MenuItemConstructorOptions,
+  protocol,
+} from "electron";
 import { existsSync, promises as fs } from "fs";
 import path from "path";
 import os from "os";
@@ -22,6 +30,33 @@ const getAppIconPath = () => {
     path.join(app.getAppPath(), "HinanaStudioIcon.png"),
   ];
   return candidates.find(existsSync);
+};
+
+const installMacMenu = (win: BrowserWindow) => {
+  const template: MenuItemConstructorOptions[] = [
+    {
+      label: "HINANA STUDIO",
+      submenu: [
+        {
+          label: "HINANA STUDIO 정보",
+          click: () => win.webContents.send("app:show-about"),
+        },
+        { type: "separator" },
+        { role: "services" },
+        { type: "separator" },
+        { role: "hide" },
+        { role: "hideOthers" },
+        { role: "unhide" },
+        { type: "separator" },
+        { role: "quit", label: "HINANA STUDIO 종료" },
+      ],
+    },
+    { role: "fileMenu" },
+    { role: "editMenu" },
+    { role: "viewMenu" },
+    { role: "windowMenu" },
+  ];
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 };
 
 protocol.registerSchemesAsPrivileged([
@@ -72,6 +107,7 @@ const createWindow = () => {
       nodeIntegration: false,
     },
   });
+  if (process.platform === "darwin") installMacMenu(win);
   const devUrl =
     process.env.VITE_DEV_SERVER_URL ||
     (app.isPackaged ? "" : "http://localhost:5173");

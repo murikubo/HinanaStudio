@@ -1189,6 +1189,7 @@ export default function App() {
   }, []);
   useEffect(() => window.hinana?.onExportProgress(setRenderProgress), []);
   useEffect(() => window.hinana?.onExportEncoder(setRenderEncoder), []);
+  useEffect(() => window.hinana?.onShowAbout(() => setShowAbout(true)), []);
   useEffect(() => {
     const close = (e: KeyboardEvent) =>
       e.key === "Escape" && setShowAbout(false);
