@@ -691,6 +691,16 @@ header {
   left: 0;
   will-change: transform;
 }
+.snap-guide {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 6;
+  width: 1px;
+  background: #55d7ff;
+  box-shadow: 0 0 6px #55d7ff;
+  pointer-events: none;
+}
 @media (max-width: 1200px), (max-height: 800px) {
   .timeline {
     height: 300px !important;

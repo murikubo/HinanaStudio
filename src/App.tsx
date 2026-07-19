@@ -26,6 +26,7 @@ import {
   Search,
   ZoomIn,
   ZoomOut,
+  Magnet,
   ChevronDown,
   Sparkles,
   Info,
@@ -279,6 +280,9 @@ export default function App() {
     assetId?: string;
   } | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<string | null>(null);
+  const [selectedClips, setSelectedClips] = useState<string[]>([]);
+  const [rippleEditing, setRippleEditing] = useState(false);
+  const [snapGuide, setSnapGuide] = useState<number | null>(null);
   const [editingCaption, setEditingCaption] = useState<string | null>(null);
   const [settings, setSettings] = useState({
     width: 1920,
@@ -674,11 +678,19 @@ export default function App() {
         setClips((v) => [...v, copy]);
         setSelected(copy.id);
       } else if ((e.key === "Delete" || e.key === "Backspace") && selected) {
+        const ids = selectedClips.length ? selectedClips : [selected];
         const clip = clips.find((c) => c.id === selected);
         if (clip && !tracks.find((t) => t.id === clip.track)?.locked) {
-          setClips((v) => v.filter((c) => c.id !== selected));
+          setClips((v) =>
+            v.filter(
+              (c) =>
+                !ids.includes(c.id) ||
+                tracks.find((track) => track.id === c.track)?.locked,
+            ),
+          );
           setSelected("");
-          flash("클립을 제거했습니다");
+          setSelectedClips([]);
+          flash(`${ids.length}개 클립을 제거했습니다`);
         }
       } else if (
         (e.key === "Delete" || e.key === "Backspace") &&
@@ -689,7 +701,15 @@ export default function App() {
     };
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
-  }, [tracks, activeTrack, clips, selected, selectedAsset, time]);
+  }, [
+    tracks,
+    activeTrack,
+    clips,
+    selected,
+    selectedClips,
+    selectedAsset,
+    time,
+  ]);
   const addFiles = (files: FileList | File[]) => {
     const next = [...files].map((f) => {
       const kind: Kind = f.type.startsWith("video")
@@ -830,6 +850,27 @@ export default function App() {
     if (selected === id) setSelected("");
     setMenu(null);
     flash("클립을 제거했습니다");
+  };
+  const rippleDeleteClip = (id: string) => {
+    setClips((items) => {
+      const removed = items.find((item) => item.id === id);
+      if (!removed) return items;
+      const end = removed.start + removed.duration;
+      return items
+        .filter((item) => item.id !== id)
+        .map((item) =>
+          item.track === removed.track && item.start >= end
+            ? {
+                ...item,
+                start: Math.max(removed.start, item.start - removed.duration),
+              }
+            : item,
+        );
+    });
+    setSelected("");
+    setSelectedClips([]);
+    setMenu(null);
+    flash("클립을 제거하고 뒤쪽 간격을 닫았습니다");
   };
   const moveClipLayer = (id: string, direction: "front" | "back") => {
     setClips((items) => {
@@ -1338,6 +1379,20 @@ export default function App() {
   ) => {
     e.stopPropagation();
     e.preventDefault();
+    if (e.shiftKey && mode === "move") {
+      setSelectedClips((ids) =>
+        ids.includes(clip.id)
+          ? ids.filter((id) => id !== clip.id)
+          : [...ids, clip.id],
+      );
+      setSelected(clip.id);
+      return;
+    }
+    const movingIds =
+      mode === "move" && selectedClips.includes(clip.id)
+        ? selectedClips
+        : [clip.id];
+    if (!selectedClips.includes(clip.id)) setSelectedClips([clip.id]);
     setSelected(clip.id);
     setActiveTrack(clip.track);
     if (tracks.find((t) => t.id === clip.track)?.locked) {
@@ -1349,6 +1404,11 @@ export default function App() {
       start = clip.start,
       duration = clip.duration,
       startIndex = tracks.findIndex((t) => t.id === clip.track);
+    const movingStarts = new Map(
+      clips
+        .filter((item) => movingIds.includes(item.id))
+        .map((item) => [item.id, item.start] as const),
+    );
     const type =
       clip.kind === "audio" ? "audio" : clip.kind === "text" ? "text" : "video";
     const snap = (value: number) => {
@@ -1360,6 +1420,7 @@ export default function App() {
           .flatMap((c) => [c.start, c.start + c.duration]),
       ];
       const near = points.find((p) => Math.abs(p - value) < 0.12);
+      setSnapGuide(near ?? null);
       return near ?? value;
     };
     const move = (ev: PointerEvent) => {
@@ -1379,12 +1440,20 @@ export default function App() {
           proposed?.type === type && !proposed.locked
             ? proposed.id
             : clip.track;
+        const snappedStart = Math.max(0, snap(start + dx));
+        const appliedDx = snappedStart - start;
         setClips((v) =>
-          v.map((c) =>
-            c.id === clip.id
-              ? { ...c, start: Math.max(0, snap(start + dx)), track: nextTrack }
-              : c,
-          ),
+          v.map((c) => {
+            if (!movingIds.includes(c.id)) return c;
+            return {
+              ...c,
+              start: Math.max(
+                0,
+                (movingStarts.get(c.id) ?? c.start) + appliedDx,
+              ),
+              track: c.id === clip.id ? nextTrack : c.track,
+            };
+          }),
         );
       } else if (mode === "left") {
         const next = Math.min(
@@ -1406,19 +1475,24 @@ export default function App() {
               : c,
           ),
         );
-      } else
+      } else {
+        const nextDuration = Math.max(0.2, snap(start + duration + dx) - start);
+        const durationDelta = nextDuration - duration;
         setClips((v) =>
           v.map((c) =>
             c.id === clip.id
-              ? {
-                  ...c,
-                  duration: Math.max(0.2, snap(start + duration + dx) - start),
-                }
-              : c,
+              ? { ...c, duration: nextDuration }
+              : rippleEditing &&
+                  c.track === clip.track &&
+                  c.start >= start + duration
+                ? { ...c, start: Math.max(0, c.start + durationDelta) }
+                : c,
           ),
         );
+      }
     };
     const up = () => {
+      setSnapGuide(null);
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
     };
@@ -3074,6 +3148,13 @@ export default function App() {
             <button title="플레이헤드에서 분할" onClick={splitClip}>
               <Scissors />
             </button>
+            <button
+              className={rippleEditing ? "active" : ""}
+              title="리플 트림: 뒤쪽 클립을 함께 이동"
+              onClick={() => setRippleEditing((value) => !value)}
+            >
+              <Magnet /> 리플
+            </button>
             <button onClick={addText}>
               <Type />
             </button>
@@ -3203,6 +3284,9 @@ export default function App() {
                   </span>
                 ))}
               </div>
+              {snapGuide !== null && (
+                <i className="snap-guide" style={{ left: snapGuide * px }} />
+              )}
               {tracks.map(({ id: track }) => (
                 <div
                   className={`track ${activeTrack === track ? "active" : ""}`}
@@ -3229,7 +3313,7 @@ export default function App() {
                     .map((c) => (
                       <div
                         key={c.id}
-                        className={`clip ${c.kind} ${selected === c.id ? "selected" : ""}`}
+                        className={`clip ${c.kind} ${selected === c.id || selectedClips.includes(c.id) ? "selected" : ""}`}
                         style={{
                           left: c.start * px,
                           width: Math.max(45, c.duration * px),
@@ -3332,6 +3416,9 @@ export default function App() {
               )}
               <button onClick={() => removeClip(menu.clipId!)}>
                 클립 제거 <span>Delete</span>
+              </button>
+              <button onClick={() => rippleDeleteClip(menu.clipId!)}>
+                리플 삭제 <span>간격 닫기</span>
               </button>
             </>
           )}
