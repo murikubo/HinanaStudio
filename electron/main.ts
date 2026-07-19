@@ -262,8 +262,15 @@ ipcMain.handle("render:export", async (event, project: any) => {
   );
   let base = "base0",
     visualIndex = 0;
-  mediaClips.forEach((clip: any, i: number) => {
-    if (clip.kind !== "video" && clip.kind !== "image") return;
+  const visualMediaClips = mediaClips
+    .map((clip: any, inputIndex: number) => ({ clip, inputIndex }))
+    .filter(({ clip }: any) => clip.kind === "video" || clip.kind === "image")
+    .sort((a: any, b: any) => {
+      const aOrder = a.clip.zOrder ?? -a.clip.track * 100_000 + a.inputIndex;
+      const bOrder = b.clip.zOrder ?? -b.clip.track * 100_000 + b.inputIndex;
+      return aOrder - bOrder;
+    });
+  visualMediaClips.forEach(({ clip, inputIndex: i }: any) => {
     const scale = Math.max(0.01, (clip.scale ?? 100) / 100),
       opacity = clip.opacity ?? 1;
     const sourceStart = clip.sourceStart ?? 0;
@@ -371,7 +378,7 @@ ipcMain.handle("render:export", async (event, project: any) => {
       x = `W*(${xPercent})-w/2`,
       y = `H*(${yPercent})-h/2`;
     filters.push(
-      `[${base}][${prep}]overlay=x='${x}':y='${y}':enable='between(t,${clip.start},${clip.start + clip.duration})'[${next}]`,
+      `[${base}][${prep}]overlay=x='${x}':y='${y}':eval=frame:enable='between(t,${clip.start},${clip.start + clip.duration})'[${next}]`,
     );
     base = next;
   });

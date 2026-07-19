@@ -195,6 +195,7 @@ type Clip = {
   sourceStart?: number;
   scale?: number;
   rotation?: number;
+  zOrder?: number;
   fit?: "contain" | "cover";
   fadeIn?: number;
   fadeOut?: number;
@@ -450,7 +451,13 @@ export default function App() {
   );
   const visualClips = visible
     .filter((c) => c.kind === "video" || c.kind === "image")
-    .sort((a, b) => b.track - a.track);
+    .sort((a, b) => {
+      const aIndex = clips.findIndex((clip) => clip.id === a.id);
+      const bIndex = clips.findIndex((clip) => clip.id === b.id);
+      const aOrder = a.zOrder ?? -a.track * 100_000 + aIndex;
+      const bOrder = b.zOrder ?? -b.track * 100_000 + bIndex;
+      return aOrder - bOrder;
+    });
 
   useEffect(() => {
     if (!playing) return;
@@ -784,8 +791,24 @@ export default function App() {
     setClips((items) => {
       const clip = items.find((item) => item.id === id);
       if (!clip) return items;
-      const rest = items.filter((item) => item.id !== id);
-      return direction === "front" ? [...rest, clip] : [clip, ...rest];
+      const visual = items
+        .map((item, index) => ({ item, index }))
+        .filter(({ item }) => item.kind === "video" || item.kind === "image")
+        .sort((a, b) => {
+          const aOrder = a.item.zOrder ?? -a.item.track * 100_000 + a.index;
+          const bOrder = b.item.zOrder ?? -b.item.track * 100_000 + b.index;
+          return aOrder - bOrder;
+        })
+        .map(({ item }) => item);
+      const reordered = visual.filter((item) => item.id !== id);
+      if (direction === "front") reordered.push(clip);
+      else reordered.unshift(clip);
+      const orders = new Map(
+        reordered.map((item, index) => [item.id, index] as const),
+      );
+      return items.map((item) =>
+        orders.has(item.id) ? { ...item, zOrder: orders.get(item.id) } : item,
+      );
     });
     setMenu(null);
     flash(
