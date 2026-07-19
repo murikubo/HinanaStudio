@@ -1935,7 +1935,7 @@ export default function App() {
                 if (!a) return null;
                 return (
                   <div
-                    className={`media-object ${selected === c.id ? "selected" : ""}`}
+                    className={`media-object ${selected === c.id ? "selected" : ""} ${selected && selected !== c.id ? "interaction-disabled" : ""}`}
                     key={c.id}
                     onPointerDown={(e) => beginMediaDrag(e, c)}
                     onContextMenu={(e) => {
@@ -2001,7 +2001,7 @@ export default function App() {
                     )}
                     {c.mosaicRegion && (
                       <div
-                        className="mosaic-region"
+                        className={`mosaic-region ${selected === c.id ? "selected" : ""}`}
                         style={{
                           left: `${c.mosaicRegion.x}%`,
                           top: `${c.mosaicRegion.y}%`,

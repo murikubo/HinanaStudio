@@ -8,6 +8,13 @@
   pointer-events: auto;
   touch-action: none;
 }
+.mosaic-region:not(.selected) {
+  outline-color: #ffcf5a66;
+}
+.media-object.interaction-disabled,
+.media-object.interaction-disabled * {
+  pointer-events: none !important;
+}
 .mosaic-source {
   position: absolute;
   pointer-events: none;
