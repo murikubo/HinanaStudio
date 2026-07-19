@@ -16,7 +16,8 @@
     ]
   },
   "scripts": {
-    "dev": "concurrently -k \"vite\" \"wait-on http://localhost:5173 && node scripts/launch-electron.cjs\"",
+    "dev": "npm run build:electron && concurrently -k \"vite\" \"wait-on http://localhost:5173 && node scripts/launch-electron.cjs\"",
+    "build:electron": "tsc -p electron/tsconfig.json",
     "build": "tsc && vite build && tsc -p electron/tsconfig.json",
     "preview": "vite preview",
     "start": "node scripts/launch-electron.cjs"
