@@ -6,6 +6,7 @@ import {
   Menu,
   MenuItemConstructorOptions,
   protocol,
+  shell,
 } from "electron";
 import {
   createReadStream,
@@ -239,6 +240,10 @@ const createWindow = () => {
     (app.isPackaged ? "" : "http://localhost:5173");
   if (devUrl) win.loadURL(devUrl);
   else win.loadFile(path.join(__dirname, "../dist/index.html"));
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith("https://")) void shell.openExternal(url);
+    return { action: "deny" };
+  });
 };
 
 ipcMain.handle("project:save", async (_event, data: string) => {

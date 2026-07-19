@@ -286,6 +286,17 @@
   color: #e8e8eb;
   font-weight: 600;
 }
+.about-github {
+  margin-left: 8px;
+  color: #9994ff;
+  font-size: 10px;
+  font-weight: 500;
+  text-decoration: none;
+}
+.about-github:hover {
+  color: #c4c1ff;
+  text-decoration: underline;
+}
 .asset.offline {
   opacity: 0.7;
 }

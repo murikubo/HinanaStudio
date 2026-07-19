@@ -3401,7 +3401,17 @@ export default function App() {
               </div>
               <div>
                 <dt>개발/제작자</dt>
-                <dd>비나래</dd>
+                <dd>
+                  비나래
+                  <a
+                    className="about-github"
+                    href="https://github.com/murikubo"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    GitHub
+                  </a>
+                </dd>
               </div>
               <div>
                 <dt>버전</dt>
