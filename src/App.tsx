@@ -229,6 +229,7 @@ type Clip = {
     startProgress?: number;
     /** Normalized clip position where the end pose is reached. */
     endProgress?: number;
+    easing?: "linear" | "easeIn" | "easeOut" | "easeInOut";
     path?: { progress: number; x: number; y: number }[];
   };
   mosaicRegion?: {
@@ -346,7 +347,7 @@ export default function App() {
       clip.motion.endProgress ?? 1,
     );
     const clipProgress = (time - clip.start) / Math.max(0.001, clip.duration);
-    const progress = Math.max(
+    const linearProgress = Math.max(
       0,
       Math.min(
         1,
@@ -354,6 +355,16 @@ export default function App() {
           Math.max(0.001, endProgress - startProgress),
       ),
     );
+    const progress =
+      clip.motion.easing === "easeIn"
+        ? linearProgress * linearProgress
+        : clip.motion.easing === "easeOut"
+          ? 1 - (1 - linearProgress) * (1 - linearProgress)
+          : clip.motion.easing === "easeInOut"
+            ? linearProgress < 0.5
+              ? 2 * linearProgress * linearProgress
+              : 1 - Math.pow(-2 * linearProgress + 2, 2) / 2
+            : linearProgress;
     const lerp = (start: number, end: number) =>
       start + (end - start) * progress;
     const path = clip.motion.path;
@@ -2529,6 +2540,48 @@ export default function App() {
                   </div>
                 );
               })}
+              {active?.motion && ["video", "image"].includes(active.kind) && (
+                <svg
+                  className="motion-path-guide"
+                  viewBox="0 0 100 100"
+                  preserveAspectRatio="none"
+                  aria-hidden="true"
+                >
+                  <polyline
+                    points={(active.motion.path?.length
+                      ? active.motion.path
+                      : [
+                          {
+                            progress: 0,
+                            x: active.motion.startX,
+                            y: active.motion.startY,
+                          },
+                          {
+                            progress: 1,
+                            x: active.motion.endX,
+                            y: active.motion.endY,
+                          },
+                        ]
+                    )
+                      .map((point) => `${point.x},${point.y}`)
+                      .join(" ")}
+                  />
+                  {(active.motion.path?.length
+                    ? active.motion.path
+                    : [
+                        { progress: 0, x: active.motion.startX, y: active.motion.startY },
+                        { progress: 1, x: active.motion.endX, y: active.motion.endY },
+                      ]
+                  ).map((point, index) => (
+                    <circle
+                      key={`${point.progress}-${index}`}
+                      cx={point.x}
+                      cy={point.y}
+                      r={index === 0 || index === (active.motion?.path?.length ?? 2) - 1 ? 0.8 : 0.45}
+                    />
+                  ))}
+                </svg>
+              )}
               {visible
                 .filter((c) => c.kind === "text")
                 .map((c) => (
@@ -3121,6 +3174,26 @@ export default function App() {
                         드래그하세요. 재생 헤드를 옮겨 시작·종료 프레임을 각각
                         지정하면 그 구간에서만 움직입니다.
                       </p>
+                      <label>가속 방식</label>
+                      <select
+                        className="property-select motion-select"
+                        value={active.motion.easing ?? "linear"}
+                        onChange={(e) =>
+                          update({
+                            motion: {
+                              ...active.motion!,
+                              easing: e.target.value as NonNullable<
+                                Clip["motion"]
+                              >["easing"],
+                            },
+                          })
+                        }
+                      >
+                        <option value="linear">일정한 속도</option>
+                        <option value="easeIn">천천히 시작</option>
+                        <option value="easeOut">천천히 멈춤</option>
+                        <option value="easeInOut">부드럽게 시작·종료</option>
+                      </select>
                       {(
                         [
                           ["startX", "시작 X"],

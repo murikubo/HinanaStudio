@@ -518,7 +518,15 @@ ipcMain.handle("render:export", async (event, project: any) => {
       0.001,
       clip.duration * (motionEndProgress - motionStartProgress),
     );
-    const motionProgress = `min(1\\,max(0\\,(t-${motionStartTime})/${motionSpan}))`;
+    const linearMotionProgress = `min(1\\,max(0\\,(t-${motionStartTime})/${motionSpan}))`;
+    const motionProgress =
+      motion?.easing === "easeIn"
+        ? `(${linearMotionProgress})*(${linearMotionProgress})`
+        : motion?.easing === "easeOut"
+          ? `1-(1-(${linearMotionProgress}))*(1-(${linearMotionProgress}))`
+          : motion?.easing === "easeInOut"
+            ? `if(lt(${linearMotionProgress}\\,0.5)\\,2*(${linearMotionProgress})*(${linearMotionProgress})\\,1-pow(-2*(${linearMotionProgress})+2\\,2)/2)`
+            : linearMotionProgress;
     const pathExpression = (key: "x" | "y") => {
       const points = Array.isArray(motion?.path) ? motion.path : [];
       if (points.length < 2) return null;
