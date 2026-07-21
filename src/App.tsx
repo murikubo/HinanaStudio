@@ -168,6 +168,9 @@ type Asset = {
   offline?: boolean;
   proxyPath?: string;
   proxyStatus?: "creating" | "ready" | "failed";
+  embeddedData?: string;
+  shapeType?: "rectangle" | "ellipse" | "triangle";
+  shapeColor?: string;
 };
 type Clip = {
   id: string;
@@ -269,6 +272,27 @@ const initialTracks: Track[] = [
 const fmt = (s: number) =>
   `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(Math.floor(s % 60)).padStart(2, "0")}:${String(Math.floor((s % 1) * 30)).padStart(2, "0")}`;
 const uid = () => Math.random().toString(36).slice(2);
+const createShapeImage = (
+  shape: NonNullable<Asset["shapeType"]>,
+  color: string,
+) => {
+  const canvas = document.createElement("canvas");
+  canvas.width = 512;
+  canvas.height = 512;
+  const context = canvas.getContext("2d")!;
+  context.fillStyle = color;
+  context.beginPath();
+  if (shape === "ellipse")
+    context.ellipse(256, 256, 220, 220, 0, 0, Math.PI * 2);
+  else if (shape === "triangle") {
+    context.moveTo(256, 28);
+    context.lineTo(484, 472);
+    context.lineTo(28, 472);
+    context.closePath();
+  } else context.roundRect(28, 28, 456, 456, 28);
+  context.fill();
+  return canvas.toDataURL("image/png");
+};
 
 export default function App() {
   const isMac = window.hinana?.platform === "darwin";
@@ -332,6 +356,7 @@ export default function App() {
       ? window.hinana.toFileUrl(asset.proxyPath)
       : asset.url;
   const active = clips.find((c) => c.id === selected),
+    activeAsset = assets.find((asset) => asset.id === active?.assetId),
     total = Math.max(15, ...clips.map((c) => c.start + c.duration)),
     px = 75 * zoom;
   const motionState = (clip: Clip) => {
@@ -877,6 +902,45 @@ export default function App() {
       return;
     }
     placeAsset(a, track, time);
+  };
+  const addShape = (shape: NonNullable<Asset["shapeType"]>) => {
+    const track = (
+      tracks.find((item) => item.id === activeTrack && item.type === "video") ||
+      tracks.find((item) => item.type === "video")
+    )?.id;
+    if (track === undefined) {
+      flash("비디오 트랙을 먼저 추가하세요");
+      return;
+    }
+    const names = { rectangle: "사각형", ellipse: "원", triangle: "삼각형" };
+    const color = "#7068ff";
+    const embeddedData = createShapeImage(shape, color);
+    const asset: Asset = {
+      id: uid(),
+      name: names[shape],
+      kind: "image",
+      url: embeddedData,
+      embeddedData,
+      shapeType: shape,
+      shapeColor: color,
+      duration: 5,
+      size: "도형",
+      color: colors.image,
+    };
+    setAssets((items) => [...items, asset]);
+    placeAsset(asset, track, time);
+    flash(`${names[shape]}을 추가했습니다`);
+  };
+  const updateShapeColor = (color: string) => {
+    if (!activeAsset?.shapeType) return;
+    const embeddedData = createShapeImage(activeAsset.shapeType, color);
+    setAssets((items) =>
+      items.map((asset) =>
+        asset.id === activeAsset.id
+          ? { ...asset, shapeColor: color, embeddedData, url: embeddedData }
+          : asset,
+      ),
+    );
   };
   const dropOnTrack = (e: React.DragEvent, track: number) => {
     e.preventDefault();
@@ -1709,8 +1773,8 @@ export default function App() {
           ? project.tracks
           : initialTracks;
       const nextAssets = Array.isArray(project.assets)
-        ? project.assets.map((a: Asset) => {
-            let url = "";
+          ? project.assets.map((a: Asset) => {
+            let url = a.embeddedData ?? "";
             if (a.path && window.hinana) {
               try {
                 url = window.hinana.toFileUrl(String(a.path));
@@ -1784,7 +1848,9 @@ export default function App() {
         setAssets(
           project.assets.map((a: Asset) => ({
             ...a,
-            url: a.path && window.hinana ? window.hinana.toFileUrl(a.path) : "",
+            url:
+              a.embeddedData ??
+              (a.path && window.hinana ? window.hinana.toFileUrl(a.path) : ""),
           })),
         );
     } catch {
@@ -1805,7 +1871,14 @@ export default function App() {
       flash("영상 내보내기는 데스크톱 앱에서 사용할 수 있습니다");
       return;
     }
-    if (assets.some((a) => clips.some((c) => c.assetId === a.id) && !a.path)) {
+    if (
+      assets.some(
+        (a) =>
+          clips.some((c) => c.assetId === a.id) &&
+          !a.path &&
+          !a.embeddedData,
+      )
+    ) {
       flash("원본 경로가 없는 미디어가 있습니다. 다시 가져와 주세요");
       return;
     }
@@ -2170,6 +2243,23 @@ export default function App() {
             </div>
           ) : tab === "effects" ? (
             <div className="effects-panel">
+              <h3>도형</h3>
+              <div className="shape-buttons">
+                <button onClick={() => addShape("rectangle")}>■ 사각형</button>
+                <button onClick={() => addShape("ellipse")}>● 원</button>
+                <button onClick={() => addShape("triangle")}>▲ 삼각형</button>
+              </div>
+              {activeAsset?.shapeType && (
+                <label className="shape-color">
+                  도형 색상
+                  <input
+                    type="color"
+                    value={activeAsset.shapeColor ?? "#7068ff"}
+                    onChange={(event) => updateShapeColor(event.target.value)}
+                  />
+                </label>
+              )}
+              <div className="divider" />
               <p>영상·이미지 클립을 선택한 뒤 효과를 조절하세요.</p>
               <button
                 onClick={() =>

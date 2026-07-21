@@ -445,6 +445,17 @@ ipcMain.handle("render:export", async (event, project: any) => {
   const assets = new Map<string, any>(
     project.assets.map((a: any) => [a.id, a]),
   );
+  for (const asset of assets.values()) {
+    if (asset.path || !asset.embeddedData) continue;
+    const match = /^data:image\/png;base64,(.+)$/i.exec(asset.embeddedData);
+    if (!match) continue;
+    const embeddedPath = path.join(
+      renderTempDir,
+      `embedded-${String(asset.id).replace(/[^a-zA-Z0-9_-]/g, "_")}.png`,
+    );
+    await fs.writeFile(embeddedPath, Buffer.from(match[1], "base64"));
+    asset.path = embeddedPath;
+  }
   const mediaClips = project.clips.filter(
     (c: any) => c.assetId && assets.get(c.assetId)?.path,
   );

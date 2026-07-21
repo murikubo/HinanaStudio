@@ -86,6 +86,34 @@
 .audio-panel {
   padding: 14px 13px;
 }
+.shape-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.shape-buttons button {
+  min-width: 0;
+  padding: 9px 4px;
+  border: 1px solid #353842;
+  border-radius: 6px;
+  background: #24262c;
+  color: #bbb;
+  font-size: 9px;
+}
+.shape-color {
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.shape-color input[type="color"] {
+  width: 42px;
+  height: 26px;
+  padding: 2px;
+  border: 1px solid #3a3d46;
+  border-radius: 5px;
+  background: #202228;
+}
 .effects-panel > p,
 .audio-panel > p {
   font-size: 9px;
