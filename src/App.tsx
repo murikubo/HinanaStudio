@@ -640,17 +640,33 @@ export default function App() {
       flash("잠긴 트랙입니다");
       return;
     }
-    const left = { ...clip, duration: time - clip.start };
-    const right = {
+    const splitOffset = time - clip.start;
+    const leftDuration = splitOffset;
+    const rightDuration = clip.duration - splitOffset;
+    const left: Clip = {
+      ...clip,
+      duration: leftDuration,
+      // A transition at the original end belongs to the right fragment.
+      fadeOut: 0,
+      videoFadeOut: 0,
+    };
+    const right: Clip = {
       ...clip,
       id: uid(),
       start: time,
-      duration: clip.start + clip.duration - time,
-      sourceStart: (clip.sourceStart ?? 0) + (time - clip.start),
+      duration: rightDuration,
+      sourceStart:
+        clip.kind === "video" || clip.kind === "audio"
+          ? (clip.sourceStart ?? 0) + splitOffset
+          : clip.sourceStart,
+      // A transition at the original beginning belongs to the left fragment.
+      fadeIn: 0,
+      videoFadeIn: 0,
       name: `${clip.name} (분할)`,
     };
     setClips((v) => v.flatMap((c) => (c.id === clip.id ? [left, right] : [c])));
     setSelected(right.id);
+    setSelectedClips([right.id]);
     flash("클립을 분할했습니다");
   };
   const removeTrack = () => {
@@ -689,6 +705,12 @@ export default function App() {
       } else if (e.key === " ") {
         e.preventDefault();
         setPlaying((v) => !v);
+      } else if (
+        (e.ctrlKey || e.metaKey) &&
+        e.key.toLowerCase() === "b"
+      ) {
+        e.preventDefault();
+        splitClip();
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
         e.preventDefault();
         e.shiftKey ? redo() : undo();
@@ -1831,7 +1853,7 @@ export default function App() {
         if (!target.closest(".project-trigger")) setShowProjectMenu(false);
         if (
           !target.closest(
-            ".media-object,.caption,.clip,.asset,.inspector,.library,aside",
+            ".media-object,.caption,.clip,.asset,.inspector,.library,aside,.toolrow",
           )
         ) {
           setSelected("");
@@ -3400,7 +3422,11 @@ export default function App() {
             <button className="active">
               <MousePointer2 />
             </button>
-            <button title="플레이헤드에서 분할" onClick={splitClip}>
+            <button
+              title={`플레이헤드에서 분할 · ${isMac ? "⌘B" : "Ctrl+B"}`}
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={splitClip}
+            >
               <Scissors />
             </button>
             <button
