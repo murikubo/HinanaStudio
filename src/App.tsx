@@ -200,6 +200,8 @@ type Clip = {
   volume?: number;
   sourceStart?: number;
   scale?: number;
+  shapeScaleX?: number;
+  shapeScaleY?: number;
   rotation?: number;
   zOrder?: number;
   fit?: "contain" | "cover";
@@ -928,7 +930,23 @@ export default function App() {
       color: colors.image,
     };
     setAssets((items) => [...items, asset]);
-    placeAsset(asset, track, time);
+    const clip: Clip = {
+      id: uid(),
+      assetId: asset.id,
+      kind: "image",
+      name: asset.name,
+      start: time,
+      duration: 5,
+      track,
+      color: colors.image,
+      scale: 35,
+      shapeScaleX: 100,
+      shapeScaleY: 100,
+    };
+    setClips((items) => [...items, clip]);
+    setSelected(clip.id);
+    setSelectedClips([clip.id]);
+    setActiveTrack(track);
     flash(`${names[shape]}을 추가했습니다`);
   };
   const updateShapeColor = (color: string) => {
@@ -1275,12 +1293,18 @@ export default function App() {
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
   };
-  const beginMediaResize = (e: React.PointerEvent, clip: Clip) => {
+  const beginMediaResize = (
+    e: React.PointerEvent,
+    clip: Clip,
+    mode: "uniform" | "horizontal" | "vertical" | "both" = "uniform",
+  ) => {
     e.preventDefault();
     e.stopPropagation();
     const canvas = e.currentTarget.closest(".canvas")!.getBoundingClientRect();
     const startX = e.clientX;
     const startY = e.clientY;
+    const startScaleX = clip.shapeScaleX ?? 100;
+    const startScaleY = clip.shapeScaleY ?? 100;
     const startScale =
       clip.motion && motionEdit === "start"
         ? clip.motion.startScale
@@ -1288,6 +1312,32 @@ export default function App() {
           ? clip.motion.endScale
           : (clip.scale ?? 100);
     const move = (event: PointerEvent) => {
+      if (mode !== "uniform") {
+        const deltaX = ((event.clientX - startX) / canvas.width) * 200;
+        const deltaY = ((event.clientY - startY) / canvas.height) * 200;
+        const shapeScaleX = Math.max(
+          5,
+          Math.min(500, startScaleX + (mode === "vertical" ? 0 : deltaX)),
+        );
+        const shapeScaleY = Math.max(
+          5,
+          Math.min(500, startScaleY + (mode === "horizontal" ? 0 : deltaY)),
+        );
+        setClips((items) =>
+          items.map((item) =>
+            item.id === clip.id
+              ? {
+                  ...item,
+                  shapeScaleX:
+                    mode === "vertical" ? startScaleX : shapeScaleX,
+                  shapeScaleY:
+                    mode === "horizontal" ? startScaleY : shapeScaleY,
+                }
+              : item,
+          ),
+        );
+        return;
+      }
       const delta =
         ((event.clientX - startX + event.clientY - startY) / canvas.width) *
         100;
@@ -2620,7 +2670,7 @@ export default function App() {
                       top: `${animated.y}%`,
                       opacity: visualOpacity(c),
                       filter: `brightness(${c.brightness ?? 1}) contrast(${c.contrast ?? 1}) saturate(${c.grayscale ? 0 : (c.saturation ?? 1)}) blur(${c.blur ?? 0}px)`,
-                      transform: `translate(-50%, -50%) rotate(${animated.rotation}deg) scale(${animated.scale / 100})`,
+                      transform: `translate(-50%, -50%) rotate(${animated.rotation}deg) scale(${(animated.scale / 100) * (a.shapeType ? (c.shapeScaleX ?? 100) / 100 : 1)}, ${(animated.scale / 100) * (a.shapeType ? (c.shapeScaleY ?? 100) / 100 : 1)})`,
                       clipPath: c.crop
                         ? c.crop.shape === "ellipse"
                           ? `ellipse(${Math.max(5, 50 - (c.crop.left + c.crop.right) / 2)}% ${Math.max(5, 50 - (c.crop.top + c.crop.bottom) / 2)}% at ${50 + (c.crop.left - c.crop.right) / 2}% ${50 + (c.crop.top - c.crop.bottom) / 2}%)`
@@ -2769,7 +2819,27 @@ export default function App() {
                         </span>
                       </div>
                     )}
-                    {selected === c.id && (
+                    {selected === c.id && a.shapeType && (
+                      <>
+                        <i
+                          className="media-resize horizontal"
+                          onPointerDown={(e) =>
+                            beginMediaResize(e, c, "horizontal")
+                          }
+                        />
+                        <i
+                          className="media-resize vertical"
+                          onPointerDown={(e) =>
+                            beginMediaResize(e, c, "vertical")
+                          }
+                        />
+                        <i
+                          className="media-resize shape-corner"
+                          onPointerDown={(e) => beginMediaResize(e, c, "both")}
+                        />
+                      </>
+                    )}
+                    {selected === c.id && !a.shapeType && (
                       <i
                         className="media-resize"
                         style={{
@@ -3239,6 +3309,36 @@ export default function App() {
                     value={active.scale ?? 100}
                     onChange={(e) => update({ scale: +e.target.value })}
                   />
+                  {activeAsset?.shapeType && (
+                    <>
+                      <label>
+                        가로 크기{" "}
+                        <em>{Math.round(active.shapeScaleX ?? 100)}%</em>
+                      </label>
+                      <input
+                        type="range"
+                        min="5"
+                        max="500"
+                        value={active.shapeScaleX ?? 100}
+                        onChange={(e) =>
+                          update({ shapeScaleX: +e.target.value })
+                        }
+                      />
+                      <label>
+                        세로 크기{" "}
+                        <em>{Math.round(active.shapeScaleY ?? 100)}%</em>
+                      </label>
+                      <input
+                        type="range"
+                        min="5"
+                        max="500"
+                        value={active.shapeScaleY ?? 100}
+                        onChange={(e) =>
+                          update({ shapeScaleY: +e.target.value })
+                        }
+                      />
+                    </>
+                  )}
                   <label>
                     회전 <em>{Math.round(active.rotation ?? 0)}°</em>
                   </label>
@@ -3308,7 +3408,14 @@ export default function App() {
                     </button>
                     <button
                       onClick={() =>
-                        update({ x: 50, y: 50, scale: 100, rotation: 0 })
+                        update({
+                          x: 50,
+                          y: 50,
+                          scale: 100,
+                          shapeScaleX: 100,
+                          shapeScaleY: 100,
+                          rotation: 0,
+                        })
                       }
                     >
                       초기화

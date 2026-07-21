@@ -667,6 +667,8 @@ ipcMain.handle("render:export", async (event, project: any) => {
     const scaleExpression = motion
       ? `${motion.startScale / 100}+${(motion.endScale - motion.startScale) / 100}*${motionProgress}`
       : String(scale);
+    const shapeScaleX = Math.max(0.05, Number(clip.shapeScaleX ?? 100) / 100);
+    const shapeScaleY = Math.max(0.05, Number(clip.shapeScaleY ?? 100) / 100);
     const rotationExpression = motion
       ? `${motion.startRotation}+${motion.endRotation - motion.startRotation}*${motionProgress}`
       : String(clip.rotation ?? 0);
@@ -688,7 +690,7 @@ ipcMain.handle("render:export", async (event, project: any) => {
         : ""
     }`;
     filters.push(
-      `[${sourceLabel}]scale=w='iw*(${scaleExpression})':h='ih*(${scaleExpression})':eval=frame,colorchannelmixer=aa=${opacity}${rotationExpression !== "0" ? `,rotate='(${rotationExpression})*PI/180':c=none:${motion ? "ow='hypot(iw,ih)':oh=ow" : "ow=rotw(iw):oh=roth(ih)"}` : ""}${videoFadeFilters}[${prep}]`,
+      `[${sourceLabel}]scale=w='iw*(${scaleExpression})*${shapeScaleX}':h='ih*(${scaleExpression})*${shapeScaleY}':eval=frame,colorchannelmixer=aa=${opacity}${rotationExpression !== "0" ? `,rotate='(${rotationExpression})*PI/180':c=none:${motion ? "ow='hypot(iw,ih)':oh=ow" : "ow=rotw(iw):oh=roth(ih)"}` : ""}${videoFadeFilters}[${prep}]`,
     );
     const xPercent = motion
         ? (pathExpression("x") ??
