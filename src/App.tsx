@@ -279,19 +279,20 @@ const createShapeImage = (
   color: string,
 ) => {
   const canvas = document.createElement("canvas");
-  canvas.width = 512;
-  canvas.height = 512;
+  const size = 2048;
+  canvas.width = size;
+  canvas.height = size;
   const context = canvas.getContext("2d")!;
   context.fillStyle = color;
   context.beginPath();
   if (shape === "ellipse")
-    context.ellipse(256, 256, 220, 220, 0, 0, Math.PI * 2);
+    context.ellipse(size / 2, size / 2, size / 2, size / 2, 0, 0, Math.PI * 2);
   else if (shape === "triangle") {
-    context.moveTo(256, 28);
-    context.lineTo(484, 472);
-    context.lineTo(28, 472);
+    context.moveTo(size / 2, 0);
+    context.lineTo(size, size);
+    context.lineTo(0, size);
     context.closePath();
-  } else context.roundRect(28, 28, 456, 456, 28);
+  } else context.rect(0, 0, size, size);
   context.fill();
   return canvas.toDataURL("image/png");
 };
@@ -1305,6 +1306,8 @@ export default function App() {
     const startY = e.clientY;
     const startScaleX = clip.shapeScaleX ?? 100;
     const startScaleY = clip.shapeScaleY ?? 100;
+    const shapeBaseSide =
+      canvas.height * Math.max(0.05, motionState(clip).scale / 100);
     const startScale =
       clip.motion && motionEdit === "start"
         ? clip.motion.startScale
@@ -1313,8 +1316,10 @@ export default function App() {
           : (clip.scale ?? 100);
     const move = (event: PointerEvent) => {
       if (mode !== "uniform") {
-        const deltaX = ((event.clientX - startX) / canvas.width) * 200;
-        const deltaY = ((event.clientY - startY) / canvas.height) * 200;
+        const deltaX =
+          ((event.clientX - startX) * 2 * 100) / shapeBaseSide;
+        const deltaY =
+          ((event.clientY - startY) * 2 * 100) / shapeBaseSide;
         const shapeScaleX = Math.max(
           5,
           Math.min(500, startScaleX + (mode === "vertical" ? 0 : deltaX)),
@@ -1823,8 +1828,11 @@ export default function App() {
           ? project.tracks
           : initialTracks;
       const nextAssets = Array.isArray(project.assets)
-          ? project.assets.map((a: Asset) => {
-            let url = a.embeddedData ?? "";
+        ? project.assets.map((a: Asset) => {
+            const refreshedShape = a.shapeType
+              ? createShapeImage(a.shapeType, a.shapeColor ?? "#7068ff")
+              : undefined;
+            let url = refreshedShape ?? a.embeddedData ?? "";
             if (a.path && window.hinana) {
               try {
                 url = window.hinana.toFileUrl(String(a.path));
@@ -1832,7 +1840,12 @@ export default function App() {
                 url = "";
               }
             }
-            return { ...a, url, offline: !url };
+            return {
+              ...a,
+              url,
+              embeddedData: refreshedShape ?? a.embeddedData,
+              offline: !url,
+            };
           })
         : [];
       setClips(nextClips);
@@ -1896,12 +1909,21 @@ export default function App() {
       if (project.settings) setSettings(project.settings);
       if (project.assets)
         setAssets(
-          project.assets.map((a: Asset) => ({
-            ...a,
-            url:
-              a.embeddedData ??
-              (a.path && window.hinana ? window.hinana.toFileUrl(a.path) : ""),
-          })),
+          project.assets.map((a: Asset) => {
+            const refreshedShape = a.shapeType
+              ? createShapeImage(a.shapeType, a.shapeColor ?? "#7068ff")
+              : undefined;
+            return {
+              ...a,
+              embeddedData: refreshedShape ?? a.embeddedData,
+              url:
+                refreshedShape ??
+                a.embeddedData ??
+                (a.path && window.hinana
+                  ? window.hinana.toFileUrl(a.path)
+                  : ""),
+            };
+          }),
         );
     } catch {
       localStorage.removeItem("hinana-autosave");
@@ -2653,9 +2675,15 @@ export default function App() {
                 const a = assets.find((x) => x.id === c.assetId);
                 if (!a) return null;
                 const animated = motionState(c);
+                const shapeWidth =
+                  animated.scale *
+                  ((c.shapeScaleX ?? 100) / 100) *
+                  (settings.height / settings.width);
+                const shapeHeight =
+                  animated.scale * ((c.shapeScaleY ?? 100) / 100);
                 return (
                   <div
-                    className={`media-object ${selected === c.id ? "selected" : ""} ${selected === c.id && motionEdit && c.motion ? "motion-editing" : ""} ${selected && selected !== c.id ? "interaction-disabled" : ""}`}
+                    className={`media-object ${a.shapeType ? "shape-object" : ""} ${selected === c.id ? "selected" : ""} ${selected === c.id && motionEdit && c.motion ? "motion-editing" : ""} ${selected && selected !== c.id ? "interaction-disabled" : ""}`}
                     key={c.id}
                     onPointerDown={(e) => beginMediaDrag(e, c)}
                     onContextMenu={(e) => {
@@ -2668,9 +2696,13 @@ export default function App() {
                       zIndex: visualOrder + 1,
                       left: `${animated.x}%`,
                       top: `${animated.y}%`,
+                      width: a.shapeType ? `${shapeWidth}%` : "100%",
+                      height: a.shapeType ? `${shapeHeight}%` : "100%",
                       opacity: visualOpacity(c),
                       filter: `brightness(${c.brightness ?? 1}) contrast(${c.contrast ?? 1}) saturate(${c.grayscale ? 0 : (c.saturation ?? 1)}) blur(${c.blur ?? 0}px)`,
-                      transform: `translate(-50%, -50%) rotate(${animated.rotation}deg) scale(${(animated.scale / 100) * (a.shapeType ? (c.shapeScaleX ?? 100) / 100 : 1)}, ${(animated.scale / 100) * (a.shapeType ? (c.shapeScaleY ?? 100) / 100 : 1)})`,
+                      transform: a.shapeType
+                        ? `translate(-50%, -50%) rotate(${animated.rotation}deg)`
+                        : `translate(-50%, -50%) rotate(${animated.rotation}deg) scale(${animated.scale / 100})`,
                       clipPath: c.crop
                         ? c.crop.shape === "ellipse"
                           ? `ellipse(${Math.max(5, 50 - (c.crop.left + c.crop.right) / 2)}% ${Math.max(5, 50 - (c.crop.top + c.crop.bottom) / 2)}% at ${50 + (c.crop.left - c.crop.right) / 2}% ${50 + (c.crop.top - c.crop.bottom) / 2}%)`
@@ -2678,7 +2710,35 @@ export default function App() {
                         : undefined,
                     }}
                   >
-                    {c.kind === "video" ? (
+                    {a.shapeType ? (
+                      <svg
+                        className="media-content shape-vector"
+                        viewBox="0 0 100 100"
+                        preserveAspectRatio="none"
+                        aria-hidden="true"
+                      >
+                        {a.shapeType === "ellipse" ? (
+                          <ellipse
+                            cx="50"
+                            cy="50"
+                            rx="50"
+                            ry="50"
+                            fill={a.shapeColor ?? "#7068ff"}
+                          />
+                        ) : a.shapeType === "triangle" ? (
+                          <polygon
+                            points="50,0 100,100 0,100"
+                            fill={a.shapeColor ?? "#7068ff"}
+                          />
+                        ) : (
+                          <rect
+                            width="100"
+                            height="100"
+                            fill={a.shapeColor ?? "#7068ff"}
+                          />
+                        )}
+                      </svg>
+                    ) : c.kind === "video" ? (
                       <video
                         className="media-content"
                         style={{

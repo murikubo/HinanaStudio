@@ -524,13 +524,16 @@ ipcMain.handle("render:export", async (event, project: any) => {
       return aOrder - bOrder;
     });
   visualMediaClips.forEach(({ clip, inputIndex: i }: any) => {
+    const asset = assets.get(clip.assetId);
     const scale = Math.max(0.01, (clip.scale ?? 100) / 100),
       opacity = clip.opacity ?? 1;
     const sourceStart = clip.sourceStart ?? 0;
     const prep = `v${i}`,
       next = `base${++visualIndex}`;
     const fitFilter =
-      clip.fit === "cover"
+      asset.shapeType
+        ? "null"
+        : clip.fit === "cover"
         ? `scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height}`
         : `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:color=0x00000000`;
     const effectFilter = `eq=brightness=${(clip.brightness ?? 1) - 1}:contrast=${clip.contrast ?? 1}:saturation=${clip.grayscale ? 0 : (clip.saturation ?? 1)}${clip.blur ? `,gblur=sigma=${clip.blur}` : ""}`;
@@ -669,6 +672,9 @@ ipcMain.handle("render:export", async (event, project: any) => {
       : String(scale);
     const shapeScaleX = Math.max(0.05, Number(clip.shapeScaleX ?? 100) / 100);
     const shapeScaleY = Math.max(0.05, Number(clip.shapeScaleY ?? 100) / 100);
+    const outputScaleExpression = asset.shapeType
+      ? `(${height}/ih)*(${scaleExpression})`
+      : scaleExpression;
     const rotationExpression = motion
       ? `${motion.startRotation}+${motion.endRotation - motion.startRotation}*${motionProgress}`
       : String(clip.rotation ?? 0);
@@ -690,7 +696,7 @@ ipcMain.handle("render:export", async (event, project: any) => {
         : ""
     }`;
     filters.push(
-      `[${sourceLabel}]scale=w='iw*(${scaleExpression})*${shapeScaleX}':h='ih*(${scaleExpression})*${shapeScaleY}':eval=frame,colorchannelmixer=aa=${opacity}${rotationExpression !== "0" ? `,rotate='(${rotationExpression})*PI/180':c=none:${motion ? "ow='hypot(iw,ih)':oh=ow" : "ow=rotw(iw):oh=roth(ih)"}` : ""}${videoFadeFilters}[${prep}]`,
+      `[${sourceLabel}]scale=w='iw*(${outputScaleExpression})*${shapeScaleX}':h='ih*(${outputScaleExpression})*${shapeScaleY}':eval=frame,colorchannelmixer=aa=${opacity}${rotationExpression !== "0" ? `,rotate='(${rotationExpression})*PI/180':c=none:${motion ? "ow='hypot(iw,ih)':oh=ow" : "ow=rotw(iw):oh=roth(ih)"}` : ""}${videoFadeFilters}[${prep}]`,
     );
     const xPercent = motion
         ? (pathExpression("x") ??
